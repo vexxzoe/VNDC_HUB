@@ -62,7 +62,6 @@ export default function AccessPage() {
   const [permissions, setPermissions] = useState(DEPARTMENT_PERMISSIONS);
   const [pendingAccounts, setPendingAccounts] = useState(PENDING_ACCOUNTS);
   const [changeLog, setChangeLog] = useState(INITIAL_CHANGE_LOG);
-  const [newAccount, setNewAccount] = useState({ email: '', department: 'Kinh doanh', role: 'member' });
   const [showAllLogs, setShowAllLogs] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -138,25 +137,6 @@ export default function AccessPage() {
   const handleReject = (account) => {
     setPendingAccounts(prev => prev.filter(a => a.id !== account.id))
     toast.info('Đã từ chối: ' + account.email)
-  };
-
-  // THAY ĐỔI 5: handleCreateAccount gọi API
-  const handleCreateAccount = async () => {
-    if (!newAccount.email?.trim())
-      return toast.error('Email là bắt buộc')
-    try {
-      await api.createUser({
-        email: newAccount.email.trim(),
-        name: newAccount.email.split('@')[0],
-        department: newAccount.department || 'Chung',
-        role: newAccount.role || 'member',
-        password: '123456'
-      })
-      toast.success('Đã tạo tài khoản: ' + newAccount.email)
-      setNewAccount({ email: '', department: 'Kinh doanh', role: 'member' })
-    } catch (err) {
-      toast.error('Lỗi tạo tài khoản: ' + err.message)
-    }
   };
 
   const visibleLogs = showAllLogs ? changeLog : changeLog.slice(0, 5);
@@ -268,40 +248,6 @@ export default function AccessPage() {
         </div>
 
         <div className="flex flex-col gap-8">
-          {/* Add Form */}
-          <div className="bg-white border border-surface-200 rounded-2xl p-5 shadow-sm">
-            <h2 className="font-bold text-surface-900 mb-4 text-lg">Thêm tài khoản mới</h2>
-            <div className="flex flex-col gap-3">
-              <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
-                <input
-                  type="email"
-                  value={newAccount.email}
-                  onChange={e => setNewAccount(p => ({ ...p, email: e.target.value }))}
-                  placeholder="email@vndc.vn"
-                  className="w-full pl-9 pr-3 py-2 border border-surface-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary-500"
-                />
-              </div>
-              <select
-                value={newAccount.department}
-                onChange={e => setNewAccount(p => ({ ...p, department: e.target.value }))}
-                className="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
-              >
-                {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
-              </select>
-              <select
-                value={newAccount.role}
-                onChange={e => setNewAccount(p => ({ ...p, role: e.target.value }))}
-                className="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
-              >
-                <option value="member">Nhân viên</option>
-                <option value="admin">Quản trị viên</option>
-              </select>
-              <Button variant="primary" icon={UserPlus} onClick={handleCreateAccount} className="w-full justify-center mt-1">
-                Tạo tài khoản
-              </Button>
-            </div>
-          </div>
 
           {/* Change Log */}
           <div>

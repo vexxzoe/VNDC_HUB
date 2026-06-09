@@ -13,7 +13,7 @@ export async function getUsers(req, res, next) {
     const { department, role, search } = req.query
     let sql = `SELECT id,email,name,department,role,phone,
                       avatar_url,is_active,created_at
-               FROM users WHERE 1=1`
+               FROM users WHERE is_active = true`
     const params = []
 
     if (department) {
@@ -151,8 +151,10 @@ export async function getDeptPermissions(req, res, next) {
 // PUT /api/users/departments/:dept/permissions — Admin only
 export async function updateDeptPermission(req, res, next) {
   try {
-    const { department } = req.params
+    const department = decodeURIComponent(req.params.dept)
     const { permission, value } = req.body
+
+    console.log('updateDeptPerm:', { department, permission, value })
 
     const validPerms = ['library','videos','forms','updates','analytics','people']
     if (!validPerms.includes(permission))

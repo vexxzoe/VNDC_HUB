@@ -29,7 +29,7 @@ function StatCard({ icon: Icon, label, value, accent }) {
   );
 }
 
-const EMPTY_FORM = { name: '', email: '', department: 'Kinh doanh', role: 'member' };
+const EMPTY_FORM = { name: '', email: '', department: 'Kinh doanh', role: 'member', password: '123456' };
 
 export default function PeoplePage() {
   const { user, isAdmin } = useAuth();
@@ -49,11 +49,15 @@ export default function PeoplePage() {
   const [collapsedGroups, setCollapsedGroups] = useState({});
 
   useEffect(() => {
+    if (user?.role !== 'admin') {
+      setLoading(false)
+      return
+    }
     api.getUsers()
       .then(data => setEmployees(data.users || []))
       .catch(() => toast.error('Không thể tải danh sách nhân viên'))
       .finally(() => setLoading(false))
-  }, []);
+  }, [user]);
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
   const uniqueDepts   = [...new Set(employees.map(e => e.department))];
@@ -95,7 +99,7 @@ export default function PeoplePage() {
     try {
       const data = await api.createUser({
         ...newEmployee,
-        password: '123456'
+        password: newEmployee.password || '123456'
       })
       setEmployees(prev => [...prev, data.user])
       setNewEmployee({ name: '', email: '', department: 'Kinh doanh', role: 'member' })
@@ -148,6 +152,16 @@ export default function PeoplePage() {
 
   // THAY ĐỔI 5: Loading state
   if (loading) return <div className="p-8 text-center text-slate-400">Đang tải...</div>
+
+  if (user?.role !== 'admin') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 text-slate-400">
+        <Users size={48} strokeWidth={1} />
+        <p className="font-bold text-slate-600">Danh sách nhân viên</p>
+        <p className="text-sm font-medium">Chỉ Admin mới có thể xem danh sách đầy đủ</p>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col gap-6">
@@ -206,6 +220,15 @@ export default function PeoplePage() {
                       placeholder="email@vndc.vn" />
                   </div>
                   {formErrors.email && <p className="text-xs text-red-500 mt-1 font-medium">{formErrors.email}</p>}
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-surface-600 mb-1.5 block">Mật khẩu</label>
+                  <div className="relative">
+                    <input type="password" value={newEmployee.password} onChange={e => setNewEmployee(p=>({...p,password:e.target.value}))}
+                      className="w-full px-3 py-2.5 border border-surface-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary-500"
+                      placeholder="123456" />
+                  </div>
+                  <p className="text-[10px] text-surface-400 font-medium mt-1">Mật khẩu mặc định nếu để trống: 123456</p>
                 </div>
                 <div>
                   <label className="text-xs font-bold text-surface-600 mb-1.5 block">Phòng ban</label>
