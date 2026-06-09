@@ -1,0 +1,294 @@
+import React, { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/context/ToastContext';
+import { DEPARTMENT_PERMISSIONS } from '@/data/mockData';
+import { Avatar, Badge, Button } from '@/components/ui';
+import { formatRelativeTime } from '@/utils/formatTime';
+import { clsx } from 'clsx';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  ShieldCheck, AlertTriangle, UserCheck, UserX, UserPlus,
+  Library, PlayCircle, FileText, Upload, BarChart2, Users, Mail
+} from 'lucide-react';
+
+const PENDING_ACCOUNTS = [
+  { id:"p1", email:"newstaff@vndc.vn",  department:"Kinh doanh", role:"member", requestedAt:"2025-05-25" },
+  { id:"p2", email:"intern@vndc.vn",    department:"CSKH",       role:"member", requestedAt:"2025-05-26" },
+];
+
+const INITIAL_CHANGE_LOG = [
+  { id:"c1", action:"Bật quyền updates", dept:"Kỹ thuật",   by:"Nguyễn Admin", time:"2025-05-20T10:00:00" },
+  { id:"c2", action:"Duyệt tài khoản",   dept:"Kinh doanh", by:"Nguyễn Admin", time:"2025-05-18T14:00:00" },
+  { id:"c3", action:"Tắt quyền people",  dept:"Nhân sự",    by:"Nguyễn Admin", time:"2025-05-15T09:00:00" },
+];
+
+const PERMISSION_LABELS = {
+  library:   { label:"Thư viện",     icon: Library },
+  videos:    { label:"Video",        icon: PlayCircle },
+  forms:     { label:"Biểu mẫu",     icon: FileText },
+  updates:   { label:"Cập nhật TL",  icon: Upload },
+  analytics: { label:"Analytics",    icon: BarChart2 },
+  people:    { label:"Nhân viên",    icon: Users },
+};
+
+const DEPARTMENTS = Object.keys(DEPARTMENT_PERMISSIONS);
+const PERM_KEYS = Object.keys(PERMISSION_LABELS);
+
+// Inline Toggle Switch
+function Toggle({ checked, onChange }) {
+  return (
+    <div
+      onClick={onChange}
+      className={clsx(
+        'w-11 h-6 rounded-full cursor-pointer transition-colors p-0.5 flex shrink-0',
+        checked ? 'bg-primary-500' : 'bg-surface-300'
+      )}
+    >
+      <div
+        className={clsx(
+          'w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200',
+          checked ? 'translate-x-5' : 'translate-x-0'
+        )}
+      />
+    </div>
+  );
+}
+
+export default function AccessPage() {
+  const { user } = useAuth();
+  const toast = useToast();
+
+  const [permissions, setPermissions] = useState(DEPARTMENT_PERMISSIONS);
+  const [pendingAccounts, setPendingAccounts] = useState(PENDING_ACCOUNTS);
+  const [changeLog, setChangeLog] = useState(INITIAL_CHANGE_LOG);
+  const [newAccount, setNewAccount] = useState({ email: '', department: 'Kinh doanh', role: 'member' });
+  const [showAllLogs, setShowAllLogs] = useState(false);
+
+
+
+  const addLog = (action, dept) => {
+    setChangeLog(prev => [{
+      id: 'c' + Date.now(),
+      action,
+      dept,
+      by: user?.name || 'System',
+      time: new Date().toISOString()
+    }, ...prev].slice(0, 20));
+  };
+
+  const handleToggle = (dept, key) => {
+    const newVal = !permissions[dept][key];
+    setPermissions(prev => ({ ...prev, [dept]: { ...prev[dept], [key]: newVal } }));
+    addLog(`${newVal ? 'Bật' : 'Tắt'} quyền ${PERMISSION_LABELS[key].label}`, dept);
+    toast.success(`Đã ${newVal ? 'bật' : 'tắt'} quyền ${PERMISSION_LABELS[key].label} cho ${dept}`);
+  };
+
+  const handleApprove = (acc) => {
+    setPendingAccounts(prev => prev.filter(p => p.id !== acc.id));
+    addLog('Duyệt tài khoản', acc.department);
+    toast.success('Đã duyệt ' + acc.email);
+  };
+
+  const handleReject = (acc) => {
+    setPendingAccounts(prev => prev.filter(p => p.id !== acc.id));
+    toast.info('Đã từ chối ' + acc.email);
+  };
+
+  const handleCreateAccount = () => {
+    if (!newAccount.email.includes('@')) {
+      toast.error('Email không hợp lệ');
+      return;
+    }
+    toast.success('Đã tạo tài khoản ' + newAccount.email);
+    addLog('Tạo tài khoản', newAccount.department);
+    setNewAccount({ email: '', department: 'Kinh doanh', role: 'member' });
+  };
+
+  const visibleLogs = showAllLogs ? changeLog : changeLog.slice(0, 5);
+
+  return (
+    <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col gap-8">
+      {/* Header */}
+      <div>
+        <h1 className="text-2xl font-bold text-surface-900">Phân quyền hệ thống</h1>
+        <p className="text-sm text-surface-500 font-medium mt-1">Quản lý quyền truy cập theo phòng ban</p>
+        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2 items-center">
+          <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0" />
+          <p className="text-sm text-amber-800 font-medium">Thay đổi phân quyền có hiệu lực ngay lập tức với tất cả nhân viên</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-8">
+        <div className="flex flex-col gap-8">
+          {/* Permission Matrix */}
+          <div>
+            <h2 className="font-bold text-surface-900 mb-4 text-lg">Ma trận phân quyền</h2>
+            <div className="bg-white border border-surface-200 rounded-2xl overflow-x-auto shadow-sm">
+              <table className="w-full min-w-[700px]">
+                <thead className="bg-surface-50 border-b border-surface-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-surface-500 uppercase tracking-wider w-40">Phòng ban</th>
+                    {PERM_KEYS.map(k => {
+                      const PIcon = PERMISSION_LABELS[k].icon;
+                      return (
+                        <th key={k} className="px-4 py-3 text-center">
+                          <div className="flex flex-col items-center gap-1">
+                            <PIcon className="w-4 h-4 text-surface-400" />
+                            <span className="text-xs font-bold text-surface-500">{PERMISSION_LABELS[k].label}</span>
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-100">
+                  {DEPARTMENTS.map(dept => (
+                    <tr key={dept} className="hover:bg-surface-50/50 transition-colors">
+                      <td className="px-4 py-4 font-semibold text-surface-900 whitespace-nowrap">{dept}</td>
+                      {PERM_KEYS.map(k => (
+                        <td key={k} className="px-4 py-4">
+                          <div className="flex justify-center">
+                            <Toggle
+                              checked={permissions[dept][k]}
+                              onChange={() => handleToggle(dept, k)}
+                            />
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Pending Accounts */}
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <h2 className="font-bold text-surface-900 text-lg">Tài khoản chờ duyệt</h2>
+              {pendingAccounts.length > 0 && <Badge variant="warning">{pendingAccounts.length}</Badge>}
+            </div>
+
+            {pendingAccounts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 bg-white border border-surface-200 rounded-2xl border-dashed">
+                <UserCheck className="w-10 h-10 text-surface-300 mb-2" />
+                <p className="font-medium text-surface-500 text-sm">Không có tài khoản chờ duyệt</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <AnimatePresence>
+                  {pendingAccounts.map(acc => (
+                    <motion.div
+                      key={acc.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, x: -20 }}
+                      className="bg-white border border-surface-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 justify-between shadow-sm"
+                    >
+                      <div className="flex items-center gap-4">
+                        <Avatar name={acc.email} size="md" />
+                        <div>
+                          <p className="font-semibold text-surface-900">{acc.email}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant="default" className="text-[10px]">{acc.department}</Badge>
+                            <Badge variant="surface" className="text-[10px]">{acc.role === 'admin' ? 'Quản trị' : 'Nhân viên'}</Badge>
+                            <span className="text-xs text-surface-400">Yêu cầu: {formatRelativeTime(acc.requestedAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 self-end sm:self-auto">
+                        <Button variant="danger" size="sm" icon={UserX} onClick={() => handleReject(acc)}>Từ chối</Button>
+                        <Button variant="success" size="sm" icon={UserCheck} onClick={() => handleApprove(acc)}>Duyệt</Button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-8">
+          {/* Add Form */}
+          <div className="bg-white border border-surface-200 rounded-2xl p-5 shadow-sm">
+            <h2 className="font-bold text-surface-900 mb-4 text-lg">Thêm tài khoản mới</h2>
+            <div className="flex flex-col gap-3">
+              <div className="relative">
+                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
+                <input
+                  type="email"
+                  value={newAccount.email}
+                  onChange={e => setNewAccount(p => ({ ...p, email: e.target.value }))}
+                  placeholder="email@vndc.vn"
+                  className="w-full pl-9 pr-3 py-2 border border-surface-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+              <select
+                value={newAccount.department}
+                onChange={e => setNewAccount(p => ({ ...p, department: e.target.value }))}
+                className="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
+              >
+                {DEPARTMENTS.map(d => <option key={d}>{d}</option>)}
+              </select>
+              <select
+                value={newAccount.role}
+                onChange={e => setNewAccount(p => ({ ...p, role: e.target.value }))}
+                className="w-full px-3 py-2 border border-surface-200 rounded-xl text-sm font-medium focus:outline-none focus:ring-1 focus:ring-primary-500 bg-white"
+              >
+                <option value="member">Nhân viên</option>
+                <option value="admin">Quản trị viên</option>
+              </select>
+              <Button variant="primary" icon={UserPlus} onClick={handleCreateAccount} className="w-full justify-center mt-1">
+                Tạo tài khoản
+              </Button>
+            </div>
+          </div>
+
+          {/* Change Log */}
+          <div>
+            <h2 className="font-bold text-surface-900 mb-3 text-lg">Lịch sử thay đổi</h2>
+            <div className="bg-white border border-surface-200 rounded-2xl overflow-hidden shadow-sm">
+              <div className="divide-y divide-surface-100">
+                <AnimatePresence>
+                  {visibleLogs.map(log => {
+                    const isEnable = log.action.includes('Bật');
+                    const isDisable = log.action.includes('Tắt');
+                    const color = isEnable ? 'bg-green-500' : isDisable ? 'bg-red-500' : 'bg-blue-500';
+                    return (
+                      <motion.div
+                        key={log.id}
+                        layout
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="flex gap-3 px-4 py-3 items-start hover:bg-surface-50 transition-colors"
+                      >
+                        <div className={clsx('w-2 h-2 rounded-full shrink-0 mt-1.5', color)} />
+                        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                          <p className="font-bold text-sm text-surface-900">{log.action}</p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <Badge variant="default" className="text-[10px] px-1.5 py-0">{log.dept}</Badge>
+                            <span className="text-xs text-surface-500 font-medium">bởi {log.by}</span>
+                          </div>
+                        </div>
+                        <span className="text-xs text-surface-400 shrink-0 font-medium">{formatRelativeTime(log.time)}</span>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+              {changeLog.length > 5 && (
+                <button
+                  onClick={() => setShowAllLogs(p => !p)}
+                  className="w-full py-3 text-xs font-semibold text-surface-500 hover:text-surface-900 hover:bg-surface-50 transition-colors border-t border-surface-100"
+                >
+                  {showAllLogs ? 'Thu gọn' : 'Xem thêm'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

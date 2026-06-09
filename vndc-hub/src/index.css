@@ -1,0 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS Variables ─────────────────────────────────── */
+:root {
+  --color-bg:           #f8fafc;
+  --color-bg-alt:       #f1f5f9;
+  --color-surface:      #ffffff;
+  --color-surface-alt:  #f8fafc;
+  --color-border:       #e2e8f0;
+  --color-border-strong:#cbd5e1;
+  --color-text:         #0f172a;
+  --color-text-muted:   #475569;
+  --color-text-faint:   #94a3b8;
+  --color-primary:      #16a34a;
+  --color-primary-hover:#15803d;
+  --color-primary-light:#dcfce7;
+  --color-primary-text: #14532d;
+  --sidebar-width:      260px;
+  --topbar-height:      64px;
+  --right-panel-width:  380px;
+}
+
+.dark {
+  --color-bg:           #0f172a;
+  --color-bg-alt:       #1e293b;
+  --color-surface:      #1e293b;
+  --color-surface-alt:  #334155;
+  --color-border:       #334155;
+  --color-border-strong:#475569;
+  --color-text:         #f1f5f9;
+  --color-text-muted:   #94a3b8;
+  --color-text-faint:   #475569;
+  --color-primary:      #22c55e;
+  --color-primary-hover:#16a34a;
+  --color-primary-light:#14532d;
+  --color-primary-text: #bbf7d0;
+}
+
+/* ─── Base ───────────────────────────────────────────── */
+* { box-sizing: border-box; }
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────── */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--color-border-strong); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-faint); }
+
+/* ─── Focus ring ─────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ─── Utility: hide scrollbar but keep scrollable ────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ─── Utility: line-clamp shorthand ──────────────────── */
+.line-clamp-1 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; }
+.line-clamp-2 { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+
+/* ─── Transition defaults ────────────────────────────── */
+button, a, input, select { transition: all 0.15s ease; }
