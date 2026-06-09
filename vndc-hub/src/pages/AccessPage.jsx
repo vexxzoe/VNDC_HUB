@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { api } from '@/utils/api';
 import { DEPARTMENT_PERMISSIONS } from '@/data/mockData';
 import { Avatar, Badge, Button } from '@/components/ui';
 import { formatRelativeTime } from '@/utils/formatTime';
@@ -63,7 +64,19 @@ export default function AccessPage() {
   const [changeLog, setChangeLog] = useState(INITIAL_CHANGE_LOG);
   const [newAccount, setNewAccount] = useState({ email: '', department: 'Kinh doanh', role: 'member' });
   const [showAllLogs, setShowAllLogs] = useState(false);
+  const [loading, setLoading] = useState(true);
 
+  // THAY ĐỔI 1: Load permissions từ API
+  useEffect(() => {
+    api.getDeptPerms()
+      .then(data => {
+        const obj = {}
+        data.permissions.forEach(p => { obj[p.department] = p })
+        setPermissions(obj)
+      })
+      .catch(() => toast.error('Không thể tải phân quyền'))
+      .finally(() => setLoading(false))
+  }, [])
 
 
   const addLog = (action, dept) => {
@@ -76,35 +89,80 @@ export default function AccessPage() {
     }, ...prev].slice(0, 20));
   };
 
-  const handleToggle = (dept, key) => {
-    const newVal = !permissions[dept][key];
-    setPermissions(prev => ({ ...prev, [dept]: { ...prev[dept], [key]: newVal } }));
-    addLog(`${newVal ? 'Bật' : 'Tắt'} quyền ${PERMISSION_LABELS[key].label}`, dept);
-    toast.success(`Đã ${newVal ? 'bật' : 'tắt'} quyền ${PERMISSION_LABELS[key].label} cho ${dept}`);
-  };
-
-  const handleApprove = (acc) => {
-    setPendingAccounts(prev => prev.filter(p => p.id !== acc.id));
-    addLog('Duyệt tài khoản', acc.department);
-    toast.success('Đã duyệt ' + acc.email);
-  };
-
-  const handleReject = (acc) => {
-    setPendingAccounts(prev => prev.filter(p => p.id !== acc.id));
-    toast.info('Đã từ chối ' + acc.email);
-  };
-
-  const handleCreateAccount = () => {
-    if (!newAccount.email.includes('@')) {
-      toast.error('Email không hợp lệ');
-      return;
+  // THAY ĐỔI 2: handleToggle gọi API thật + optimistic update
+  const handleToggle = async (dept, permKey) => {
+    const newVal = !permissions[dept]?.[permKey]
+    setPermissions(prev => ({
+      ...prev,
+      [dept]: { ...prev[dept], [permKey]: newVal }
+    }))
+    try {
+      await api.updateDeptPerm(dept, permKey, newVal)
+      const logEntry = {
+        id: 'c' + Date.now(),
+        action: (newVal ? 'Bật' : 'Tắt') + ' quyền ' + (PERMISSION_LABELS[permKey]?.label || permKey),
+        dept,
+        by: user?.name || 'System',
+        time: new Date().toISOString()
+      }
+      setChangeLog(prev => [logEntry, ...prev].slice(0, 20))
+      toast.success(`${newVal ? 'Đã bật' : 'Đã tắt'} quyền ${PERMISSION_LABELS[permKey]?.label} cho ${dept}`)
+    } catch (err) {
+      // Rollback nếu API lỗi
+      setPermissions(prev => ({
+        ...prev,
+        [dept]: { ...prev[dept], [permKey]: !newVal }
+      }))
+      toast.error('Không thể cập nhật quyền: ' + err.message)
     }
-    toast.success('Đã tạo tài khoản ' + newAccount.email);
-    addLog('Tạo tài khoản', newAccount.department);
-    setNewAccount({ email: '', department: 'Kinh doanh', role: 'member' });
+  };
+
+  // THAY ĐỔI 3: handleApprove gọi API
+  const handleApprove = async (account) => {
+    try {
+      await api.createUser({
+        email: account.email,
+        name: account.email.split('@')[0],
+        department: account.department,
+        role: account.role || 'member',
+        password: '123456'
+      })
+      setPendingAccounts(prev => prev.filter(a => a.id !== account.id))
+      toast.success('Đã duyệt tài khoản: ' + account.email)
+    } catch (err) {
+      toast.error('Lỗi duyệt tài khoản: ' + err.message)
+    }
+  };
+
+  // THAY ĐỔI 4: handleReject
+  const handleReject = (account) => {
+    setPendingAccounts(prev => prev.filter(a => a.id !== account.id))
+    toast.info('Đã từ chối: ' + account.email)
+  };
+
+  // THAY ĐỔI 5: handleCreateAccount gọi API
+  const handleCreateAccount = async () => {
+    if (!newAccount.email?.trim())
+      return toast.error('Email là bắt buộc')
+    try {
+      await api.createUser({
+        email: newAccount.email.trim(),
+        name: newAccount.email.split('@')[0],
+        department: newAccount.department || 'Chung',
+        role: newAccount.role || 'member',
+        password: '123456'
+      })
+      toast.success('Đã tạo tài khoản: ' + newAccount.email)
+      setNewAccount({ email: '', department: 'Kinh doanh', role: 'member' })
+    } catch (err) {
+      toast.error('Lỗi tạo tài khoản: ' + err.message)
+    }
   };
 
   const visibleLogs = showAllLogs ? changeLog : changeLog.slice(0, 5);
+
+  // THAY ĐỔI 6: Loading state
+  if (loading) return <div className="p-8 text-center text-slate-400">Đang tải...</div>
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col gap-8">

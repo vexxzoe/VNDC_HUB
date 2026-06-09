@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { EMPLOYEES } from '@/data/mockData';
+import { api } from '@/utils/api';
 import { Avatar, Badge, Button } from '@/components/ui';
 import { formatRelativeTime } from '@/utils/formatTime';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,7 +35,9 @@ export default function PeoplePage() {
   const { user, isAdmin } = useAuth();
   const toast = useToast();
 
-  const [employees, setEmployees] = useState(EMPLOYEES);
+  // THAY ĐỔI 1: Load employees từ API
+  const [employees, setEmployees] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode]   = useState('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
@@ -45,6 +47,13 @@ export default function PeoplePage() {
   const [editData, setEditData]       = useState({});
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [collapsedGroups, setCollapsedGroups] = useState({});
+
+  useEffect(() => {
+    api.getUsers()
+      .then(data => setEmployees(data.users || []))
+      .catch(() => toast.error('Không thể tải danh sách nhân viên'))
+      .finally(() => setLoading(false))
+  }, []);
 
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000);
   const uniqueDepts   = [...new Set(employees.map(e => e.department))];
@@ -76,33 +85,56 @@ export default function PeoplePage() {
     return Object.keys(errs).length === 0;
   };
 
-  const handleAdd = () => {
-    if (!validateAdd()) return;
-    const emp = {
-      id: 'emp-' + Date.now(),
-      name: newEmployee.name.trim(),
-      email: newEmployee.email.trim(),
-      department: newEmployee.department,
-      role: newEmployee.role,
-      joinedAt: new Date().toISOString().split('T')[0],
-    };
-    setEmployees(prev => [...prev, emp]);
-    toast.success('Đã thêm ' + emp.name);
-    setShowAddForm(false);
-    setNewEmployee(EMPTY_FORM);
-    setFormErrors({});
+  // THAY ĐỔI 2: handleAdd gọi API
+  const handleAdd = async () => {
+    if (!newEmployee.name?.trim() || !newEmployee.email?.trim())
+      return toast.error('Tên và email là bắt buộc')
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(newEmployee.email))
+      return toast.error('Email không hợp lệ')
+    try {
+      const data = await api.createUser({
+        ...newEmployee,
+        password: '123456'
+      })
+      setEmployees(prev => [...prev, data.user])
+      setNewEmployee({ name: '', email: '', department: 'Kinh doanh', role: 'member' })
+      setShowAddForm(false)
+      setFormErrors({})
+      toast.success('Đã thêm: ' + data.user.name)
+    } catch (err) {
+      toast.error('Lỗi thêm nhân viên: ' + err.message)
+    }
   };
 
-  const handleSaveEdit = (id) => {
-    setEmployees(prev => prev.map(e => e.id === id ? { ...e, ...editData } : e));
-    toast.success('Đã cập nhật thông tin');
-    setEditingId(null);
+  // THAY ĐỔI 3: handleSaveEdit gọi API
+  const handleSaveEdit = async (emp) => {
+    try {
+      const data = await api.updateUser(emp.id, {
+        name: editData.name,
+        department: editData.department,
+        role: editData.role,
+      })
+      setEmployees(prev => prev.map(e =>
+        e.id === emp.id ? data.user : e
+      ))
+      setEditingId(null)
+      toast.success('Đã cập nhật: ' + data.user.name)
+    } catch (err) {
+      toast.error('Lỗi cập nhật: ' + err.message)
+    }
   };
 
-  const handleDelete = (emp) => {
-    setEmployees(prev => prev.filter(e => e.id !== emp.id));
-    toast.success('Đã xoá ' + emp.name);
-    setConfirmDeleteId(null);
+  // THAY ĐỔI 4: handleDelete gọi API
+  const handleDelete = async (id) => {
+    try {
+      await api.deleteUser(id)
+      setEmployees(prev => prev.filter(e => e.id !== id))
+      setConfirmDeleteId(null)
+      toast.success('Đã xoá nhân viên')
+    } catch (err) {
+      toast.error('Lỗi xoá: ' + err.message)
+    }
   };
 
   const startEdit = (emp) => {
@@ -113,6 +145,9 @@ export default function PeoplePage() {
   const toggleGroup = (dept) => setCollapsedGroups(p => ({ ...p, [dept]: !p[dept] }));
 
   const formatDate = (d) => new Date(d).toLocaleDateString('vi-VN', { day:'2-digit', month:'2-digit', year:'numeric' });
+
+  // THAY ĐỔI 5: Loading state
+  if (loading) return <div className="p-8 text-center text-slate-400">Đang tải...</div>
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8 flex flex-col gap-6">
@@ -266,7 +301,7 @@ export default function PeoplePage() {
                       <div className="flex items-center gap-1.5">
                         {confirmDeleteId === emp.id ? (
                           <div className="flex items-center gap-1.5">
-                            <button onClick={() => handleDelete(emp)} className="px-2 py-1 text-xs font-bold text-white bg-red-500 rounded-lg hover:bg-red-600">Xoá</button>
+                            <button onClick={() => handleDelete(emp.id)} className="px-2 py-1 text-xs font-bold text-white bg-red-500 rounded-lg hover:bg-red-600">Xoá</button>
                             <button onClick={() => setConfirmDeleteId(null)} className="px-2 py-1 text-xs font-bold text-surface-600 bg-surface-100 rounded-lg hover:bg-surface-200">Huỷ</button>
                           </div>
                         ) : (
@@ -310,7 +345,7 @@ export default function PeoplePage() {
                             </select>
                           </div>
                           <div className="flex gap-2">
-                            <button onClick={() => handleSaveEdit(emp.id)} className="px-3 py-2 bg-primary-600 text-white text-xs font-bold rounded-xl hover:bg-primary-700 transition-colors">Lưu</button>
+                            <button onClick={() => handleSaveEdit(emp)} className="px-3 py-2 bg-primary-600 text-white text-xs font-bold rounded-xl hover:bg-primary-700 transition-colors">Lưu</button>
                             <button onClick={() => setEditingId(null)} className="px-3 py-2 bg-surface-100 text-surface-700 text-xs font-bold rounded-xl hover:bg-surface-200 transition-colors">Huỷ</button>
                           </div>
                         </div>
