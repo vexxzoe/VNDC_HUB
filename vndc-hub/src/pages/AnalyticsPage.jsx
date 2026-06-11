@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
-import { DOCUMENTS, MODULES, EMPLOYEES } from '@/data/mockData';
+import { useToast } from '@/context/ToastContext';
+import { api } from '@/utils/api';
 import { normalizeDept } from '@/utils/permissions';
+import { formatRelativeTime } from '@/utils/formatTime';
 import { useCountUp } from '@/hooks/useCountUp';
 import { Badge, Button } from '@/components/ui';
 import { motion } from 'framer-motion';
@@ -65,17 +67,42 @@ function KpiCard({ icon: Icon, title, value, trend, iconColor }) {
 export default function AnalyticsPage() {
   const { isAdmin } = useAuth();
   const navigate = useNavigate();
+  const toast = useToast();
 
   const [period, setPeriod] = useState('month');
 
-  const totalDocsCount = useCountUp(DOCUMENTS.length, 1000);
-  const totalViewsVal = DOCUMENTS.reduce((s, d) => s + d.views, 0);
-  const totalViewsCount = useCountUp(totalViewsVal, 1000);
-  const totalEmpCount = useCountUp(EMPLOYEES.length, 1000);
-  const compRate = Math.round((MODULES.filter(m => m.progress === 100).length / MODULES.length) * 100);
+  const [overview, setOverview] = useState(null)
+  const [topDocs, setTopDocs] = useState([])
+  const [deptProgress, setDeptProgress] = useState([])
+  const [activities, setActivities] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const topDocs = [...DOCUMENTS].sort((a, b) => b.views - a.views).slice(0, 5);
-  const maxViews = Math.max(...topDocs.map(d => d.views));
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([
+      api.getAnalyticsOverview(),
+      api.getTopDocs(),
+      api.getDeptProgress(),
+      api.getActivityLog(),
+    ])
+      .then(([ov, td, dp, al]) => {
+        setOverview(ov)
+        setTopDocs(td.docs || [])
+        setDeptProgress(dp.departments || [])
+        setActivities(al.activities || [])
+      })
+      .catch(() => toast.error('Không thể tải analytics'))
+      .finally(() => setLoading(false))
+  }, [period])
+
+  const totalDocsCount = useCountUp(overview?.documents?.total ?? 0, 1000);
+  const totalViewsCount = useCountUp(overview?.views?.total ?? 0, 1000);
+  const totalEmpCount = useCountUp(overview?.users?.active ?? 0, 1000);
+  const compRate = overview?.modules ? Math.round((overview.modules.unlocked / (overview.modules.total || 1)) * 100) : 0;
+
+  const maxViews = topDocs.length > 0 ? Math.max(...topDocs.map(d => d.views)) : 1;
+
+  if (loading) return <div className="p-8 text-center text-slate-400">Đang tải analytics...</div>
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col gap-8">
@@ -118,7 +145,7 @@ export default function AnalyticsPage() {
               <Badge variant="surface" className="text-xs">theo lượt xem</Badge>
             </div>
             <div className="flex flex-col gap-4">
-              {topDocs.map((doc, idx) => {
+              {(topDocs || []).map((doc, idx) => {
                 const Icon = FILE_ICONS[doc.type] || FileText;
                 const widthPct = (doc.views / maxViews) * 100;
                 const isSmall = widthPct < 15;
@@ -173,28 +200,25 @@ export default function AnalyticsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-50">
-                  {DEPARTMENTS.map(dept => {
-                    const empCount = EMPLOYEES.filter(e => e.department === dept || dept === 'Chung').length;
-                    const assigned = MODULES.filter(m => {
-                      const d = normalizeDept(m.department);
-                      return d.includes(dept) || d.includes('all');
-                    });
-                    const completed = assigned.filter(m => m.progress === 100).length;
-                    const avg = assigned.length ? Math.round(assigned.reduce((s, m) => s + m.progress, 0) / assigned.length) : 0;
+                  {(deptProgress || []).map(dept => {
+                    const empCount = dept.employee_count ?? 0;
+                    const assignedLength = dept.assigned_modules ?? 0;
+                    const completed = dept.completed_users ?? 0;
+                    const avg = dept.avg_progress ?? 0;
                     
                     let statusColor = 'danger'; let statusText = 'Cần chú ý';
                     if (avg >= 80) { statusColor = 'success'; statusText = 'Tốt'; }
                     else if (avg >= 50) { statusColor = 'warning'; statusText = 'Đang học'; }
 
                     return (
-                      <tr key={dept} className="hover:bg-surface-50 transition-colors">
+                      <tr key={dept.department} className="hover:bg-surface-50 transition-colors">
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
-                            <span className="font-semibold text-surface-900">{dept}</span>
+                            <span className="font-semibold text-surface-900">{dept.department}</span>
                             <Badge variant="surface" className="text-[10px] px-1.5 py-0">{empCount}</Badge>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-center font-medium text-surface-600">{assigned.length}</td>
+                        <td className="py-3 px-4 text-center font-medium text-surface-600">{assignedLength}</td>
                         <td className="py-3 px-4 text-center font-medium text-surface-600">{completed}</td>
                         <td className="py-3 px-4">
                           <div className="flex items-center gap-2">
@@ -257,9 +281,17 @@ export default function AnalyticsPage() {
           <div className="bg-white border border-surface-200 rounded-2xl p-6 shadow-sm">
             <h2 className="font-bold text-surface-900 text-lg mb-6">Hoạt động gần đây</h2>
             <div className="pl-2">
-              {ACTIVITY.map((item, i) => {
+              {(activities || []).map((act, i) => {
+                const item = {
+                  id: act.id,
+                  text: act.action + ': ' + (act.entity_name || ''),
+                  time: formatRelativeTime(act.log_time || act.created_at),
+                  user: act.user_name,
+                  icon: act.action.includes('Tải lên') ? Upload : act.action.includes('Duyệt') ? CheckCircle2 : act.action.includes('AI') ? Bot : act.action.includes('nhắc') ? BellRing : Info,
+                  color: act.action.includes('Tải lên') ? 'blue' : act.action.includes('Duyệt') ? 'green' : act.action.includes('AI') ? 'purple' : act.action.includes('nhắc') ? 'amber' : 'primary'
+                };
                 const Icon = item.icon;
-                const isLast = i === ACTIVITY.length - 1;
+                const isLast = i === (activities || []).length - 1;
                 return (
                   <div key={item.id} className="relative flex gap-4 pb-5">
                     {!isLast && <div className="absolute top-8 left-4 bottom-0 w-px border-l-2 border-dashed border-surface-200" />}

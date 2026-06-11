@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
+import { api } from '@/utils/api';
 import { Badge, Button } from '@/components/ui';
 import { formatRelativeTime } from '@/utils/formatTime';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -49,6 +50,7 @@ const STATUS_FILTERS = ['Tất cả', 'Chờ duyệt', 'Đã duyệt', 'AI đã 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const getFileType = (filename) => {
+  if (!filename) return 'Module';
   const ext = filename.split('.').pop().toLowerCase();
   if (['pdf','doc','docx'].includes(ext)) return 'PDF';
   if (['xlsx','xls','csv'].includes(ext)) return 'Excel';
@@ -71,10 +73,8 @@ export default function UpdatesPage() {
   const toast = useToast();
   const fileInputRef = useRef(null);
 
-  const [tasks, setTasks] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('vndc_tasks')) || INITIAL_TASKS; }
-    catch { return INITIAL_TASKS; }
-  });
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [logs, setLogs] = useState(() => {
     try { return JSON.parse(localStorage.getItem('vndc_logs')) || INITIAL_LOGS; }
@@ -84,7 +84,13 @@ export default function UpdatesPage() {
   const [dragOver, setDragOver] = useState(false);
   const [statusFilter, setStatusFilter] = useState('Tất cả');
 
-  useEffect(() => { localStorage.setItem('vndc_tasks', JSON.stringify(tasks)); }, [tasks]);
+  useEffect(() => {
+    api.getTasks()
+      .then(data => setTasks(data.tasks || []))
+      .catch(() => toast.error('Không thể tải danh sách tác vụ'))
+      .finally(() => setLoading(false))
+  }, []);
+
   useEffect(() => { localStorage.setItem('vndc_logs',  JSON.stringify(logs));  }, [logs]);
 
 
@@ -102,50 +108,80 @@ export default function UpdatesPage() {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
   };
 
-  const handleFiles = (fileList) => {
-    Array.from(fileList).forEach(file => {
-      const newTask = {
-        id: 't' + Date.now() + Math.random(),
-        name: file.name.replace(/\.[^.]+$/, ''),
-        file: file.name,
-        dept: 'Chung',
-        audience: ['all'],
-        status: 'pending',
-        progress: 0,
-        createdAt: new Date().toISOString(),
-      };
-      setTasks(prev => [newTask, ...prev]);
-      addLog('Tải lên', newTask.name, 'upload');
-      toast.success('Đã tải lên: ' + file.name);
-    });
+  const handleFiles = async (fileList) => {
+    for (const file of Array.from(fileList)) {
+      try {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('name', file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' '))
+        formData.append('department', 'Chung')
+        formData.append('audience', JSON.stringify(['all']))
+
+        const token = JSON.parse(localStorage.getItem('vndc_user') || '{}')?.token
+        const res = await fetch(
+          (import.meta.env.VITE_API_URL || 'http://localhost:3001') + '/api/updates',
+          {
+            method: 'POST',
+            headers: { Authorization: 'Bearer ' + token },
+            body: formData,
+          }
+        )
+        if (!res.ok) throw new Error('Upload failed')
+        const data = await res.json()
+        setTasks(prev => [data.task, ...prev])
+        addLog('Tải lên', data.task.name, 'upload')
+        toast.success('Đã tải lên: ' + file.name)
+      } catch (err) {
+        toast.error('Lỗi upload: ' + err.message)
+      }
+    }
   };
 
-  const handleApprove = (task) => {
-    updateTask(task.id, { status: 'approved', progress: 100 });
-    addLog('Duyệt phát hành', task.name, 'approve');
-    toast.success('Đã duyệt: ' + task.name);
+  const handleApprove = async (id) => {
+    try {
+      const data = await api.approveTask(id)
+      setTasks(prev => prev.map(t => t.id === id ? data.task : t))
+      addLog('Duyệt phát hành', data.task.name, 'approve')
+      toast.success('Đã duyệt: ' + data.task.name)
+    } catch (err) {
+      toast.error('Lỗi duyệt: ' + err.message)
+    }
   };
 
-  const handleAiTrain = (task) => {
-    updateTask(task.id, { status: 'reviewing', progress: 60 });
-    toast.info('AI đang xử lý tài liệu...');
-    setTimeout(() => {
-      updateTask(task.id, { status: 'ai_trained', progress: 100 });
-      addLog('Cho AI học', task.name, 'ai');
-      toast.success('AI đã học xong: ' + task.name);
-    }, 1500);
+  const handleAiTrain = async (id) => {
+    const task = tasks.find(t => t.id === id)
+    toast.info('AI đang xử lý tài liệu...')
+    try {
+      const data = await api.trainAI(id)
+      setTasks(prev => prev.map(t => t.id === id ? data.task : t))
+      addLog('Cho AI học', data.task.name, 'ai')
+      toast.success('AI đã học xong: ' + data.task.name)
+    } catch (err) {
+      toast.error('Lỗi AI: ' + err.message)
+    }
   };
 
-  const handleNotify = (task) => {
-    updateTask(task.id, { status: 'notified' });
-    addLog('Gửi nhắc học', task.name, 'notify');
-    toast.success('Đã gửi thông báo tới ' + task.audience.join(', '));
+  const handleNotify = async (id) => {
+    try {
+      const data = await api.notifyUsers(id)
+      setTasks(prev => prev.map(t => t.id === id ? data.task : t))
+      addLog('Gửi nhắc học', data.task.name, 'notify')
+      toast.success(data.message || 'Đã gửi thông báo')
+    } catch (err) {
+      toast.error('Lỗi gửi nhắc: ' + err.message)
+    }
   };
 
-  const handleDelete = (task) => {
-    setTasks(prev => prev.filter(t => t.id !== task.id));
-    addLog('Xoá tài liệu', task.name, 'delete');
-    toast.success('Đã xoá');
+  const handleDelete = async (id) => {
+    try {
+      const task = tasks.find(t => t.id === id)
+      await api.deleteTask(id)
+      setTasks(prev => prev.filter(t => t.id !== id))
+      addLog('Xoá tài liệu', task?.name || '', 'delete')
+      toast.success('Đã xoá')
+    } catch (err) {
+      toast.error('Lỗi xoá: ' + err.message)
+    }
   };
 
   // ─── Derived state ─────────────────────────────────────────────────────────
@@ -162,6 +198,7 @@ export default function UpdatesPage() {
   });
 
   // ─── Render ────────────────────────────────────────────────────────────────
+  if (loading) return <div className="p-8 text-center text-slate-400">Đang tải...</div>
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col lg:flex-row gap-6">
@@ -249,7 +286,7 @@ export default function UpdatesPage() {
           <div className="flex flex-col gap-3">
             <AnimatePresence initial={false}>
               {filteredTasks.map(task => {
-                const fileType = getFileType(task.file);
+                const fileType = getFileType(task.file_name || '');
                 const FIcon    = FILE_ICON_MAP[fileType] || FileText;
                 const statusCfg = STATUS_CONFIG[task.status] || STATUS_CONFIG.pending;
                 const StatusIcon = statusCfg.icon;
@@ -276,7 +313,7 @@ export default function UpdatesPage() {
                         </div>
                         <div className="min-w-0">
                           <p className="font-semibold text-surface-900 line-clamp-1">{task.name}</p>
-                          <p className="text-xs text-surface-400 font-medium mt-0.5">{task.file}</p>
+                          <p className="text-xs text-surface-400 font-medium mt-0.5">{task.file_name || ''}</p>
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1.5 shrink-0">
@@ -296,22 +333,22 @@ export default function UpdatesPage() {
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Users className="w-4 h-4 text-surface-400" />
-                        {task.audience.map(a => a === 'all' ? 'Toàn công ty' : a).join(', ')}
+                        {(task.audience || []).map(a => a === 'all' ? 'Toàn công ty' : a).join(', ')}
                       </div>
                     </div>
 
                     {/* Row 3 — progress */}
-                    {task.progress > 0 && (
+                    {(task.progress ?? 0) > 0 && (
                       <div className="mt-4">
                         <div className="flex justify-between text-xs font-semibold mb-1.5">
                           <span className="text-surface-500">Tiến độ xử lý</span>
-                          <span className="text-surface-700">{task.progress}%</span>
+                          <span className="text-surface-700">{task.progress ?? 0}%</span>
                         </div>
                         <div className="h-1.5 w-full bg-surface-100 rounded-full overflow-hidden">
                           <motion.div
-                            className={clsx('h-full', task.progress < 100 ? 'bg-primary-500' : 'bg-green-500')}
+                            className={clsx('h-full', (task.progress ?? 0) < 100 ? 'bg-primary-500' : 'bg-green-500')}
                             initial={{ width: '0%' }}
-                            animate={{ width: `${task.progress}%` }}
+                            animate={{ width: `${task.progress ?? 0}%` }}
                             transition={{ duration: 0.6, ease: 'easeOut' }}
                           />
                         </div>
@@ -321,7 +358,7 @@ export default function UpdatesPage() {
                     {/* Row 4 — actions */}
                     <div className="flex flex-wrap gap-2 mt-4">
                       <button
-                        onClick={() => canApprove && handleApprove(task)}
+                        onClick={() => canApprove && handleApprove(task.id)}
                         disabled={!canApprove}
                         title={!canApprove ? 'Tài liệu đã được duyệt' : 'Duyệt phát hành'}
                         className={clsx(
@@ -335,7 +372,7 @@ export default function UpdatesPage() {
                       </button>
 
                       <button
-                        onClick={() => canAiTrain && handleAiTrain(task)}
+                        onClick={() => canAiTrain && handleAiTrain(task.id)}
                         disabled={!canAiTrain}
                         title={!canAiTrain ? 'Cần duyệt phát hành trước' : 'Cho AI học tài liệu'}
                         className={clsx(
@@ -349,7 +386,7 @@ export default function UpdatesPage() {
                       </button>
 
                       <button
-                        onClick={() => canNotify && handleNotify(task)}
+                        onClick={() => canNotify && handleNotify(task.id)}
                         disabled={!canNotify}
                         title={!canNotify ? 'Cần duyệt hoặc AI học trước' : 'Gửi nhắc học'}
                         className={clsx(
@@ -364,7 +401,7 @@ export default function UpdatesPage() {
 
                       {isAdmin && (
                         <button
-                          onClick={() => handleDelete(task)}
+                          onClick={() => handleDelete(task.id)}
                           title="Xoá tài liệu"
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold text-red-500 border border-surface-200 hover:bg-red-50 hover:border-red-200 transition-colors"
                         >
