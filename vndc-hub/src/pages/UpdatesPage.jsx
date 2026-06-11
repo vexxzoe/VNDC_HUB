@@ -249,7 +249,7 @@ export default function UpdatesPage() {
             onClick={() => fileInputRef.current?.click()}
             className="mt-3 px-5 py-2.5 bg-white border border-surface-200 rounded-xl text-sm font-semibold text-surface-700 hover:bg-surface-50 hover:border-surface-300 transition-colors shadow-sm"
           >
-            Chọn từ máy tính
+            {isAdmin ? 'Tải lên tài liệu (tự động duyệt)' : 'Đề xuất tài liệu mới (chờ Admin duyệt)'}
           </button>
           <input
             ref={fileInputRef}

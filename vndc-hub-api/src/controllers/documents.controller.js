@@ -109,6 +109,7 @@ export async function createDocument(req, res, next) {
     const filePath = file ? `documents/${file.filename}` : null
     const fileUrl = file ? `/uploads/documents/${file.filename}` : null
 
+    // Tạo document
     const { rows } = await query(
       `INSERT INTO documents
         (name, type, department, audience, version, tag, size,
@@ -120,7 +121,7 @@ export async function createDocument(req, res, next) {
     )
     const doc = rows[0]
 
-    // Lưu version history
+    // Version history
     if (file) {
       await query(
         `INSERT INTO document_versions
@@ -129,6 +130,20 @@ export async function createDocument(req, res, next) {
         [doc.id, version, filePath, 'Phiên bản đầu tiên', req.user.id]
       )
     }
+
+    // ← MỚI: Tạo update_task tương ứng (status=approved, đã duyệt luôn)
+    await query(
+      `INSERT INTO update_tasks
+        (name, file_name, department, audience, status, progress, created_by)
+       VALUES ($1,$2,$3,$4,'approved',100,$5)`,
+      [
+        name.trim(),
+        file?.originalname || null,
+        department,
+        audienceArr,
+        req.user.id
+      ]
+    )
 
     await query(
       'INSERT INTO activity_logs (action,entity_type,entity_name,user_id) VALUES ($1,$2,$3,$4)',

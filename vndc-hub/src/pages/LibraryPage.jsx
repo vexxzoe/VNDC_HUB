@@ -197,12 +197,21 @@ export default function LibraryPage() {
           <p className="text-surface-500 mt-1">{results.length} tài liệu · cập nhật lần cuối {formatRelativeTime(DOCUMENTS[0].updatedAt)}</p>
         </div>
         <div className="flex gap-3 w-full sm:w-auto">
-          <Button variant="secondary" icon={Upload} onClick={() => setIsUploadOpen(true)} className="flex-1 sm:flex-none justify-center">
-            Tải lên tài liệu
-          </Button>
-          <Button variant="primary" icon={Plus} onClick={() => setIsUploadOpen(true)} className="flex-1 sm:flex-none justify-center">
-            Thêm tài liệu
-          </Button>
+          {user?.role === 'admin' && (
+            <div className="flex gap-2">
+              <Button variant="secondary" icon={Upload} onClick={() => setIsUploadOpen(true)} className="flex-1 sm:flex-none justify-center">
+                Tải lên tài liệu
+              </Button>
+              <Button variant="primary" icon={Plus} onClick={() => setIsUploadOpen(true)} className="flex-1 sm:flex-none justify-center">
+                Thêm tài liệu
+              </Button>
+            </div>
+          )}
+          {user?.role !== 'admin' && (
+            <p className="text-sm text-slate-400 flex items-center h-full">
+              Liên hệ Admin để thêm tài liệu mới
+            </p>
+          )}
         </div>
       </div>
 
