@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useLearning } from '@/context/LearningContext';
 import { useToast } from '@/context/ToastContext';
-import { QUIZ_QUESTIONS, MODULES } from '@/data/mockData';
 import { getAssignedModules } from '@/utils/permissions';
+import { api } from '@/utils/api';
 import { Modal } from '@/components/ui/Modal';
 import { Badge, Button } from '@/components/ui';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -126,8 +126,18 @@ function CertModal({ open, onClose, user, module, score }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function QuizPage() {
   const { user } = useAuth();
-  const { modules, updateProgress, updateQuizScore } = useLearning();
+  const { updateProgress, updateQuizScore } = useLearning();
   const toast = useToast();
+
+  const [modules, setModules] = useState([]);
+  const [loadingModules, setLoadingModules] = useState(true);
+
+  useEffect(() => {
+    api.getModules()
+      .then(data => setModules(data.modules || []))
+      .catch(() => toast.error('Không thể tải danh sách module'))
+      .finally(() => setLoadingModules(false))
+  }, []);
 
   const [phase, setPhase]               = useState('select');
   const [selectedModule, setSelectedModule] = useState(null);
@@ -136,6 +146,10 @@ export default function QuizPage() {
   const [showCert, setShowCert]         = useState(false);
   const [timeLeft, setTimeLeft]         = useState(60);
   const [resultData, setResultData]     = useState(null); // { score, correct, total }
+
+  const [questions, setQuestions] = useState([]);
+  const [loadingQuiz, setLoadingQuiz] = useState(false);
+  const [quizError, setQuizError] = useState('');
 
   const timerRef = useRef(null);
 
@@ -157,7 +171,6 @@ export default function QuizPage() {
     return () => clearInterval(timerRef.current);
   }, [phase, currentQ]);
 
-  const questions = selectedModule ? (QUIZ_QUESTIONS[selectedModule.id] || []) : [];
   const total = questions.length;
 
   const handleTimeUp = useCallback(() => {
@@ -173,25 +186,59 @@ export default function QuizPage() {
     });
   }, [currentQ, total]);
 
-  const startQuiz = (mod) => {
-    setSelectedModule(mod);
-    setPhase('quiz');
-    setCurrentQ(0);
-    setAnswers({});
-    setTimeLeft(60);
-    setResultData(null);
+  const startQuiz = async (module) => {
+    setQuizError('')
+    setLoadingQuiz(true)
+    try {
+      const data = await api.getQuiz(module.id)
+      if (!data.questions || data.questions.length === 0) {
+        setQuizError('Module này chưa có câu hỏi quiz')
+        setLoadingQuiz(false)
+        return
+      }
+      setQuestions(data.questions)
+      setSelectedModule(module)
+      setCurrentQ(0)
+      setAnswers({})
+      setTimeLeft(60)
+      setPhase('quiz')
+    } catch (err) {
+      if (err.message?.includes('chưa có quiz') ||
+          err.message?.includes('không tồn tại')) {
+        setQuizError('Module này chưa có câu hỏi quiz')
+      } else {
+        toast.error('Không thể tải quiz: ' + err.message)
+      }
+    } finally {
+      setLoadingQuiz(false)
+    }
   };
 
-  const submitQuiz = useCallback(() => {
+  const submitQuiz = async () => {
     clearInterval(timerRef.current);
-    const qs = QUIZ_QUESTIONS[selectedModule?.id] || [];
-    const correct = qs.filter((q, i) => answers[i] === q.answer).length;
-    const score = Math.round((correct / qs.length) * 100);
-    updateQuizScore(selectedModule.id, score);
-    if (score >= 80) updateProgress(selectedModule.id, 100);
-    setResultData({ score, correct, total: qs.length });
-    setPhase('result');
-  }, [answers, selectedModule, updateProgress, updateQuizScore]);
+    const answersById = {}
+    questions.forEach((q, index) => {
+      if (answers[index] !== undefined) {
+        answersById[q.id] = answers[index]
+      }
+    })
+
+    try {
+      const result = await api.submitQuiz(selectedModule.id, answersById)
+      setResultData({
+        score: result.score,
+        correct: result.correct,
+        total: questions.length,
+        passed: result.passed,
+        certificate: result.certificate || null
+      })
+      updateQuizScore(selectedModule.id, result.score);
+      if (result.passed) updateProgress(selectedModule.id, 100);
+      setPhase('result')
+    } catch (err) {
+      toast.error('Lỗi nộp bài: ' + err.message)
+    }
+  };
 
   const assignedModules = getAssignedModules(modules, user);
   const doneCount = assignedModules.filter(m => m.quizScore !== null).length;
@@ -199,13 +246,19 @@ export default function QuizPage() {
   const avgScore = quizScores.length ? Math.round(quizScores.reduce((a,b)=>a+b,0)/quizScores.length) : null;
 
   // ── PHASE: SELECT ──────────────────────────────────────────────────────────
+  if (loadingModules) return (
+    <div className="p-8 text-center text-slate-400">
+      Đang tải modules...
+    </div>
+  )
+
   if (phase === 'select') return (
     <div className="max-w-7xl mx-auto px-6 py-8">
       <h1 className="text-2xl font-bold text-surface-900">Quiz & Chứng nhận</h1>
       <p className="text-sm text-surface-500 font-medium mt-1">Kiểm tra kiến thức và nhận chứng nhận hoàn thành</p>
 
       <div className="grid grid-cols-3 gap-3 mt-5 mb-8">
-        <StatCard icon={ClipboardList} label="Modules có quiz" value={Object.keys(QUIZ_QUESTIONS).length} />
+        <StatCard icon={ClipboardList} label="Modules" value={assignedModules.length} />
         <StatCard icon={CheckCircle2} label="Đã làm" value={doneCount} accent="success" />
         <StatCard icon={Award} label="Điểm TB" value={avgScore !== null ? avgScore : '—'} accent="primary" />
       </div>
@@ -213,7 +266,6 @@ export default function QuizPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {assignedModules.map(mod => {
           const ModIcon = ICON_MAP[mod.icon] || BookOpen;
-          const hasQuiz = !!QUIZ_QUESTIONS[mod.id];
           const scored  = mod.quizScore !== null;
           const passed  = scored && mod.quizScore >= 80;
 
@@ -230,12 +282,7 @@ export default function QuizPage() {
                 <h3 className="font-bold text-lg text-surface-900 mt-3">{mod.title}</h3>
 
                 <div className="mt-3 flex-1">
-                  {!hasQuiz ? (
-                    <div className="flex flex-col gap-1">
-                      <Badge variant="default" className="bg-surface-100 text-surface-500 w-fit">Chưa có quiz</Badge>
-                      <p className="text-xs text-surface-400 font-medium mt-1">Nội dung đang chuẩn bị</p>
-                    </div>
-                  ) : scored ? (
+                  {scored ? (
                     <div className="flex flex-col gap-1">
                       <div className="flex items-baseline gap-1">
                         <span className="text-3xl font-extrabold text-primary-600">{mod.quizScore}</span>
@@ -247,32 +294,27 @@ export default function QuizPage() {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-1">
-                      <p className="text-sm text-surface-500 font-medium">{QUIZ_QUESTIONS[mod.id].length} câu hỏi</p>
-                      <div className="flex items-center gap-1.5 text-xs text-surface-400 font-medium">
-                        <Clock className="w-3.5 h-3.5" />
-                        ~{QUIZ_QUESTIONS[mod.id].length * 60} giây
-                      </div>
+                      <p className="text-sm text-surface-500 font-medium">Sẵn sàng kiểm tra</p>
                     </div>
                   )}
                 </div>
 
                 <div className="mt-4">
-                  {mod.locked ? (
-                    <button disabled className="w-full py-2.5 rounded-xl text-sm font-semibold bg-surface-100 text-surface-400 cursor-not-allowed">🔒 Chưa mở khoá</button>
-                  ) : !hasQuiz ? (
-                    <button disabled className="w-full py-2.5 rounded-xl text-sm font-semibold bg-surface-100 text-surface-400 cursor-not-allowed">Chưa có quiz</button>
-                  ) : (
-                    <button
-                      onClick={() => startQuiz(mod)}
-                      className={clsx(
-                        'w-full py-2.5 rounded-xl text-sm font-semibold transition-colors',
-                        scored
-                          ? 'bg-white border border-surface-200 text-surface-700 hover:bg-surface-50'
-                          : 'bg-primary-600 text-white hover:bg-primary-700'
-                      )}
-                    >
-                      {scored ? 'Làm lại quiz' : 'Bắt đầu quiz'}
-                    </button>
+                  <button
+                    onClick={() => startQuiz(mod)}
+                    disabled={loadingQuiz}
+                    className={clsx(
+                      'w-full py-2.5 rounded-xl text-sm font-semibold transition-colors',
+                      scored
+                        ? 'bg-white border border-surface-200 text-surface-700 hover:bg-surface-50'
+                        : 'bg-primary-600 text-white hover:bg-primary-700',
+                      loadingQuiz && 'opacity-50 cursor-not-allowed'
+                    )}
+                  >
+                    {loadingQuiz && selectedModule?.id === mod.id ? 'Đang tải...' : (scored ? 'Làm lại quiz' : 'Bắt đầu quiz')}
+                  </button>
+                  {quizError && selectedModule?.id === mod.id && (
+                    <p className="text-sm text-red-500 mt-2 text-center">{quizError}</p>
                   )}
                 </div>
               </div>

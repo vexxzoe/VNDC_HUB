@@ -36,8 +36,22 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('profile');
 
   // Profile Form
-  const [profileForm, setProfileForm] = useState({ name: user?.name || '', email: user?.email || '', phone: '', bio: '' });
+  const [profileForm, setProfileForm] = useState({
+    name: user?.name || '',
+    phone: user?.phone || '',
+    bio: user?.bio || '',
+  })
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setProfileForm({
+        name: user.name || '',
+        phone: user.phone || '',
+        bio: user.bio || '',
+      })
+    }
+  }, [user])
 
   // Password Form
   const [passwordForm, setPasswordForm] = useState({ current: '', newPass: '', confirm: '' });
@@ -53,14 +67,35 @@ export default function SettingsPage() {
 
 
 
-  const handleSaveProfile = () => {
-    setSaveSuccess(true);
-    toast.success('Đã lưu thông tin');
-    setTimeout(() => setSaveSuccess(false), 3000);
-  };
+  const handleSaveProfile = async () => {
+    if (!profileForm.name?.trim()) {
+      toast.error('Họ tên không được để trống')
+      return
+    }
+    try {
+      const data = await api.updateProfile({
+        name: profileForm.name.trim(),
+        phone: profileForm.phone || '',
+        bio: profileForm.bio || '',
+      })
+      // Cập nhật user trong localStorage để giữ tên mới
+      const stored = JSON.parse(localStorage.getItem('vndc_user') || '{}')
+      localStorage.setItem('vndc_user', JSON.stringify({
+        ...stored,
+        name: data.user.name,
+        phone: data.user.phone,
+        bio: data.user.bio,
+      }))
+      setSaveSuccess(true)
+      toast.success('Đã lưu thông tin!')
+      setTimeout(() => setSaveSuccess(false), 3000)
+    } catch (err) {
+      toast.error('Lỗi lưu thông tin: ' + err.message)
+    }
+  }
 
   const handleResetProfile = () => {
-    setProfileForm({ name: user?.name || '', email: user?.email || '', phone: '', bio: '' });
+    setProfileForm({ name: user?.name || '', phone: user?.phone || '', bio: user?.bio || '' });
   };
 
   const calcStrength = (pass) => {
@@ -85,14 +120,11 @@ export default function SettingsPage() {
       return
     }
 
-    console.log('CHANGE PASS: form=', passwordForm)
-    console.log('CHANGE PASS: calling api.changePassword...')
     try {
       const result = await api.changePassword(
         passwordForm.current,
         passwordForm.newPass
       )
-      console.log('CHANGE PASS: result=', result)
       toast.success('Đổi mật khẩu thành công! Đang đăng xuất...')
       
       // Xoá token cũ khỏi localStorage
@@ -103,7 +135,6 @@ export default function SettingsPage() {
         window.location.href = '/login'
       }, 2000)
     } catch (err) {
-      console.log('CHANGE PASS: error=', err.message)
       if (err.message.includes('không đúng') ||
           err.message.includes('incorrect')) {
         setPasswordErrors({ current: 'Mật khẩu hiện tại không đúng' })
@@ -194,7 +225,7 @@ export default function SettingsPage() {
             <div className="bg-surface-50 border border-surface-100 rounded-xl p-4 grid grid-cols-2 gap-y-3 gap-x-4 mt-2">
               <div><p className="text-xs text-surface-400 font-medium">Phòng ban</p><p className="text-sm font-semibold text-surface-800">{user?.department}</p></div>
               <div><p className="text-xs text-surface-400 font-medium">Vai trò</p><p className="text-sm font-semibold text-surface-800">{user?.role === 'admin' ? 'Quản trị viên' : 'Nhân viên'}</p></div>
-              <div><p className="text-xs text-surface-400 font-medium">Ngày tham gia</p><p className="text-sm font-semibold text-surface-800">01/01/2024</p></div>
+              <div><p className="text-xs text-surface-400 font-medium">Ngày tham gia</p><p className="text-sm font-semibold text-surface-800">{user?.created_at ? new Date(user.created_at).toLocaleDateString('vi-VN') : '—'}</p></div>
               <div><p className="text-xs text-surface-400 font-medium mb-1">Trạng thái</p><Badge variant="success" className="text-[10px]">Đang hoạt động</Badge></div>
             </div>
           </div>
