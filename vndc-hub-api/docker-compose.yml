@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  vndc_hub_db:
+    image: postgres:16-alpine
+    container_name: vndc_hub_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vndc_hub
+      POSTGRES_USER: vndc_user
+      POSTGRES_PASSWORD: vndc_pass_2025
+    ports:
+      - "5433:5432"
+    volumes:
+      - vndc_hub_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vndc_user -d vndc_hub"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  vndc_hub_redis:
+    image: redis:7-alpine
+    container_name: vndc_hub_redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - vndc_hub_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  vndc_hub_api:
+    build: .
+    container_name: vndc_hub_api
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      DB_HOST: vndc_hub_db
+      DB_PORT: 5432
+      DB_NAME: vndc_hub
+      DB_USER: vndc_user
+      DB_PASSWORD: vndc_pass_2025
+      REDIS_HOST: vndc_hub_redis
+      REDIS_PORT: 6379
+      JWT_SECRET: vndc_hub_super_secret_jwt_2025
+      FRONTEND_URL: http://localhost:5173
+      UPLOAD_DIR: /app/uploads
+      GROQ_API_KEY: ${GROQ_API_KEY}
+    volumes:
+      - ./uploads:/app/uploads
+    depends_on:
+      vndc_hub_db:
+        condition: service_healthy
+      vndc_hub_redis:
+        condition: service_healthy
+
+volumes:
+  vndc_hub_db_data:
+    name: vndc_hub_db_data
+  vndc_hub_redis_data:
+    name: vndc_hub_redis_data

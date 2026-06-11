@@ -12,7 +12,7 @@ import { clsx } from 'clsx';
 import {
   Files, Eye, Users, TrendingUp, Info,
   Upload, CheckCircle2, Award, ShieldCheck, Bot, UserPlus, BookOpen,
-  FileText, Table2, Video
+  FileText, Table2, Video, BellRing
 } from 'lucide-react';
 
 const MISSING_KEYWORDS = [
