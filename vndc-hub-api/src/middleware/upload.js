@@ -4,7 +4,7 @@ import fs from 'fs'
 import { config } from '../config/env.js'
 
 // Đảm bảo thư mục tồn tại
-const uploadDir = path.join(process.cwd(), config.UPLOAD_DIR, 'documents')
+const uploadDir = path.resolve(process.cwd(), config.UPLOAD_DIR, 'documents')
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true })
 
 const storage = multer.diskStorage({
