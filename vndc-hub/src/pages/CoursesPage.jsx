@@ -3,8 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useLearning } from '@/context/LearningContext';
 import { useToast } from '@/context/ToastContext';
-import { DOCUMENTS } from '@/data/mockData';
-import { MODULES } from '@/data/mockData';
 import { api } from '@/utils/api';
 import { getAssignedModules, getFilteredDocs, normalizeDept } from '@/utils/permissions';
 import { Badge, Button } from '@/components/ui';
@@ -33,6 +31,13 @@ export default function CoursesPage() {
   const toast = useToast();
 
   const [selectedDept, setSelectedDept] = useState('Tất cả');
+  const [docsData, setDocsData] = useState([]);
+
+  useEffect(() => {
+    api.getDocuments()
+      .then(data => setDocsData(data.documents || []))
+      .catch(err => console.error('Load docs error:', err))
+  }, []);
 
   const assignedModules = getAssignedModules(modules, user);
   const completedCount = assignedModules.filter(m => m.progress === 100).length;
@@ -51,7 +56,7 @@ export default function CoursesPage() {
     return selectedDept === 'Tất cả' || d.includes(selectedDept) || d.includes('all');
   });
 
-  const assignedDocs = getFilteredDocs(DOCUMENTS, user, 'all', 'all').slice(0, 4);
+  const assignedDocs = getFilteredDocs(docsData || [], user, 'all', 'all').slice(0, 4);
 
   const handleCTA = async (m) => {
     if (m.locked) return;
@@ -80,7 +85,7 @@ export default function CoursesPage() {
               {assignedModules.length} module được giao · {completedCount} module hoàn thành
             </p>
             <div className="flex flex-wrap gap-2 pt-2">
-              <div className="px-3 py-1.5 rounded-full bg-white/10 text-sm font-medium border border-white/20 backdrop-blur-md">📚 {assignedDocs.length} Tài liệu</div>
+              <div className="px-3 py-1.5 rounded-full bg-white/10 text-sm font-medium border border-white/20 backdrop-blur-md">📚 {(assignedDocs || []).length} Tài liệu</div>
               <div className="px-3 py-1.5 rounded-full bg-white/10 text-sm font-medium border border-white/20 backdrop-blur-md">🎥 {assignedModules.reduce((s,m)=>s+m.videos, 0)} Video</div>
               <div className="px-3 py-1.5 rounded-full bg-white/10 text-sm font-medium border border-white/20 backdrop-blur-md">✅ {completedCount} Hoàn thành</div>
             </div>
@@ -213,11 +218,11 @@ export default function CoursesPage() {
       <div className="border-t border-surface-200 pt-8 flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <h2 className="text-xl font-bold text-surface-900">Tài liệu học tập được giao</h2>
-          <Badge variant="primary">{assignedDocs.length}</Badge>
+          <Badge variant="primary">{(assignedDocs || []).length}</Badge>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {assignedDocs.map(doc => {
+          {(assignedDocs || []).map(doc => {
             const DocIcon = ICON_MAP[doc.icon] || FileText;
             return (
               <div key={doc.id} className="flex items-center gap-3 bg-white border border-surface-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow">

@@ -39,9 +39,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setIsLoading(true);
     try {
-      console.log('LOGIN: calling API...');
       const data = await api.login(email, password);
-      console.log('LOGIN: success', data);
       const userData = {
         ...data.user,
         token: data.accessToken,
@@ -52,7 +50,6 @@ export const AuthProvider = ({ children }) => {
       toast.success('Đăng nhập thành công!');
       return { success: true };
     } catch (err) {
-      console.log('LOGIN: error caught', err.message);
       toast.error(err.message || 'Email hoặc mật khẩu không chính xác');
       return { success: false, error: err.message };
     } finally {

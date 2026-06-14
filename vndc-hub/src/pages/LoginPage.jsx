@@ -30,7 +30,6 @@ export default function LoginPage() {
     e?.preventDefault();
     setErrorMsg('');
     setLoading(true);
-    console.log('HANDLE LOGIN: email=', email, 'pass=', password);
     
     if (!email || !password) {
       setErrorMsg('Vui lòng nhập đầy đủ email và mật khẩu');
@@ -41,12 +40,10 @@ export default function LoginPage() {
     
     try {
       const result = await login(email, password);
-      console.log('HANDLE LOGIN: result=', result);
       
       if (result.success) {
         navigate('/dashboard');
       } else {
-        console.log('HANDLE LOGIN: setting error:', result.error);
         setErrorMsg(result.error || 'Email hoặc mật khẩu không đúng');
         triggerShake();
         setLoading(false);
