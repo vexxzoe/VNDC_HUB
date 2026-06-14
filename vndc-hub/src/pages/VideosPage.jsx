@@ -147,8 +147,8 @@ export default function VideosPage() {
                   onError={() => setVideoError(true)}
                   onLoadStart={() => setVideoError(false)}
                 >
-                  <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url}`} type="video/mp4" />
-                  <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url}`} type="video/webm" />
+                  <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url.replace(/\.mp4$/i, '.stream')}`} type="video/mp4" />
+                  <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url.replace(/\.webm$/i, '.stream')}`} type="video/webm" />
                   Trình duyệt không hỗ trợ video này.
                 </video>
               )
@@ -269,7 +269,7 @@ export default function VideosPage() {
                   {v.file_url ? (
                     <video
                       className="w-full h-full object-cover"
-                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${v.file_url}`}
+                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${v.file_url.replace(/\.(mp4|webm)$/i, '.stream')}`}
                       preload="metadata"
                       muted
                       style={{ pointerEvents: 'none' }}
