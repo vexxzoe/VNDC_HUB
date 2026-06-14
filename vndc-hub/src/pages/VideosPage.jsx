@@ -5,8 +5,9 @@ import { Badge, Button } from '@/components/ui';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { Eye, Clock, Share2, Play, CheckCircle2 } from 'lucide-react';
+import { api } from '@/utils/api';
 
-const VIDEOS = [
+const VIDEOS_FALLBACK = [
   { id:"v1", title:"Onboarding nhân viên mới",         duration:"12:34", dept:"Chung",       thumb:"👋", views:210, tag:"onboarding" },
   { id:"v2", title:"Hướng dẫn sử dụng CRM",            duration:"08:45", dept:"Kinh doanh",  thumb:"💻", views:134, tag:"crm" },
   { id:"v3", title:"Kỹ năng xử lý khiếu nại",          duration:"15:20", dept:"CSKH",        thumb:"🎧", views:98,  tag:"cskh" },
@@ -23,8 +24,42 @@ export default function VideosPage() {
   const { user } = useAuth();
   const toast = useToast();
 
-  const [selectedVideo, setSelectedVideo] = useState(VIDEOS[0]);
+  const [videos, setVideos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedVideo, setSelectedVideo] = useState(null);
   const [filterDept, setFilterDept] = useState('Tất cả');
+  
+  useEffect(() => {
+    api.getDocuments({ type: 'Video' })
+      .then(data => {
+        const apiVideos = data.documents || []
+        if (apiVideos.length > 0) {
+          const converted = apiVideos.map(doc => ({
+            id: doc.id,
+            title: doc.name,
+            duration: '—',
+            dept: doc.department,
+            thumb: '🎬',
+            views: doc.views || 0,
+            tag: doc.tag || '',
+            file_url: doc.file_url,
+          }))
+          setVideos(converted)
+        } else {
+          setVideos(VIDEOS_FALLBACK)
+        }
+      })
+      .catch(() => {
+        setVideos(VIDEOS_FALLBACK)
+      })
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    if (videos.length > 0 && !selectedVideo) {
+      setSelectedVideo(videos[0])
+    }
+  }, [videos])
   
   const [watched, setWatched] = useState(() => {
     try {
@@ -55,14 +90,20 @@ export default function VideosPage() {
     });
   };
 
-  const filteredVideos = VIDEOS.filter(v => filterDept === 'Tất cả' || v.dept === filterDept);
+  const filteredVideos = (videos || []).filter(v => filterDept === 'Tất cả' || v.dept === filterDept);
   
-  const relatedVideos = VIDEOS.filter(v => 
-    v.id !== selectedVideo.id && 
+  const relatedVideos = (videos || []).filter(v => 
+    selectedVideo && v.id !== selectedVideo.id && 
     (v.dept === selectedVideo.dept || v.tag === selectedVideo.tag)
   ).slice(0, 4);
 
-  const pct = Math.round((watched.size / VIDEOS.length) * 100) || 0;
+  const pct = Math.round((watched.size / (videos.length || 1)) * 100) || 0;
+
+  if (loading || !selectedVideo) return (
+    <div className="p-8 text-center text-slate-400">
+      Đang tải video...
+    </div>
+  )
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col lg:flex-row gap-5">
@@ -89,13 +130,21 @@ export default function VideosPage() {
               </div>
               
               <button 
-                onClick={() => toast.info("Player sẽ được tích hợp với video thật")}
+                onClick={() => {
+                  if (selectedVideo.file_url) {
+                    window.open('http://localhost:3001' + selectedVideo.file_url, '_blank');
+                  } else {
+                    toast.info("Player sẽ được tích hợp với video thật");
+                  }
+                }}
                 className="mt-6 w-16 h-16 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors border border-white/10"
               >
                 <Play className="w-8 h-8 ml-1" />
               </button>
 
-              <p className="text-white/50 text-sm mt-4 font-medium">▶ Demo player — tích hợp video thật ở giai đoạn sau</p>
+              <p className="text-white/50 text-sm mt-4 font-medium">
+                {selectedVideo.file_url ? 'Video thật sẽ được tích hợp player sau' : '▶ Demo player — tích hợp video thật ở giai đoạn sau'}
+              </p>
             </motion.div>
           </AnimatePresence>
         </div>
@@ -159,7 +208,7 @@ export default function VideosPage() {
       <div className="w-full lg:w-80 flex-shrink-0 bg-white border border-surface-200 rounded-2xl overflow-hidden lg:sticky lg:top-20 h-fit flex flex-col max-h-[800px] shadow-sm">
         <div className="px-4 py-3 border-b border-surface-100 bg-surface-50 flex items-center justify-between">
           <h3 className="font-semibold text-surface-900">Danh sách phát</h3>
-          <Badge variant="primary" className="bg-primary-50 text-primary-700">{watched.size}/{VIDEOS.length} đã xem</Badge>
+          <Badge variant="primary" className="bg-primary-50 text-primary-700">{watched.size}/{videos.length} đã xem</Badge>
         </div>
 
         <div className="px-3 py-3 flex gap-1.5 flex-wrap border-b border-surface-100 bg-white">
