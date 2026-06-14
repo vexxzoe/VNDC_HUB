@@ -343,7 +343,27 @@ export default function LibraryPage() {
                       <Star className={clsx("w-5 h-5", activeDoc.bookmarked ? "fill-primary-500 text-primary-500" : "text-surface-400")} />
                     </Button>
                     <Button variant="secondary" size="sm" className="hidden sm:flex shrink-0">Chia sẻ</Button>
-                    <Button variant="primary" size="sm" icon={Download} className="shrink-0" onClick={() => toast.success("Đang tải xuống...")}>Tải xuống</Button>
+                    <Button 
+                      variant="primary" 
+                      size="sm" 
+                      icon={Download} 
+                      className="shrink-0" 
+                      onClick={() => {
+                        if (activeDoc.file_url) {
+                          const link = document.createElement('a');
+                          link.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${activeDoc.file_url}`;
+                          link.download = activeDoc.name || 'document';
+                          link.target = '_blank';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        } else {
+                          toast.error("File chưa có trên server");
+                        }
+                      }}
+                    >
+                      Tải xuống
+                    </Button>
                   </div>
                 </div>
 

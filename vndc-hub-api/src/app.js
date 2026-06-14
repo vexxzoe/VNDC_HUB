@@ -52,6 +52,7 @@ app.use('/uploads', (req, res, next) => {
     // Cho phép video streaming với range requests
     res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+    res.setHeader('Content-Disposition', 'inline')
   }
 }))
 app.use('/api', router)
