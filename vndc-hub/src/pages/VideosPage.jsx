@@ -20,6 +20,60 @@ const VIDEOS_FALLBACK = [
 
 const DEPARTMENTS = ['Tất cả', 'Chung', 'Kinh doanh', 'CSKH', 'Kỹ thuật'];
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+// Component tạo thumbnail từ video bằng Canvas API
+// Dùng thuộc tính crossOrigin + toDataURL để capture frame mà không bị IDM can thiệp
+function VideoThumb({ fileUrl }) {
+  const canvasRef = React.useRef(null);
+  const [captured, setCaptured] = React.useState(false);
+  const [failed, setFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!fileUrl) return;
+    const video = document.createElement('video');
+    video.crossOrigin = 'anonymous';
+    video.muted = true;
+    video.preload = 'metadata';
+    // Dùng .stream để tránh IDM bắt
+    video.src = `${API_BASE}${fileUrl.replace(/\.(mp4|webm)$/i, '.stream')}`;
+
+    video.addEventListener('loadeddata', () => {
+      video.currentTime = 1.5;
+    });
+    video.addEventListener('seeked', () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvas.width = video.videoWidth || 320;
+      canvas.height = video.videoHeight || 180;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      setCaptured(true);
+      video.src = '';
+      video.load();
+    });
+    video.addEventListener('error', () => setFailed(true));
+    video.load();
+    return () => { video.src = ''; video.load(); };
+  }, [fileUrl]);
+
+  if (failed) return <span className="text-2xl">🎬</span>;
+
+  return (
+    <>
+      <canvas
+        ref={canvasRef}
+        className="w-full h-full object-cover"
+        style={{ display: captured ? 'block' : 'none' }}
+      />
+      {!captured && (
+        <span className="text-2xl">🎬</span>
+      )}
+    </>
+  );
+}
+
+
 export default function VideosPage() {
   const { user } = useAuth();
   const toast = useToast();
@@ -267,16 +321,7 @@ export default function VideosPage() {
               >
                 <div className="w-20 h-12 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 relative overflow-hidden text-2xl">
                   {v.file_url ? (
-                    <video
-                      className="w-full h-full object-cover"
-                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${v.file_url.replace(/\.(mp4|webm)$/i, '.stream')}`}
-                      preload="metadata"
-                      muted
-                      style={{ pointerEvents: 'none' }}
-                      onLoadedMetadata={(e) => {
-                        e.target.currentTime = 1;
-                      }}
-                    />
+                    <VideoThumb fileUrl={v.file_url} />
                   ) : (
                     v.thumb || '🎬'
                   )}
