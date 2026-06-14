@@ -41,7 +41,7 @@ export default function VideosPage() {
         if (apiVideos.length > 0) {
           const converted = apiVideos.map(doc => ({
             id: doc.id,
-            title: doc.name,
+            title: doc.name || doc.id || 'Video không tên',
             duration: '—',
             dept: doc.department,
             thumb: '🎬',
@@ -155,7 +155,7 @@ export default function VideosPage() {
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-white">
                 <span className="text-6xl">{selectedVideo.thumb || '🎬'}</span>
-                <p className="font-bold text-lg">{selectedVideo.title}</p>
+                <p className="font-bold text-lg">{selectedVideo?.title || selectedVideo?.name || 'Video'}</p>
                 <p className="text-white/50 text-sm">Video demo — chưa có file thật</p>
               </div>
             )}
@@ -169,11 +169,11 @@ export default function VideosPage() {
         {/* Video info bar */}
         <div className="mt-5 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
           <div>
-            <h2 className="font-bold text-lg text-surface-900">{selectedVideo.title}</h2>
+            <h2 className="font-bold text-lg text-surface-900">{selectedVideo?.title || selectedVideo?.name || 'Video'}</h2>
             <div className="flex items-center gap-4 mt-2 text-sm text-surface-500 font-medium">
               <Badge variant="default" className="text-[11px]">{selectedVideo.dept}</Badge>
               <div className="flex items-center gap-1.5"><Eye className="w-4 h-4" /> {selectedVideo.views} lượt xem</div>
-              <div className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> {selectedVideo.duration}</div>
+              <div className="flex items-center gap-1.5"><Clock className="w-4 h-4" /> {selectedVideo.duration || '—'}</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -219,7 +219,7 @@ export default function VideosPage() {
                   </div>
                   <div className="p-3">
                     <p className="text-sm font-semibold text-surface-900 line-clamp-2 mb-1.5 leading-snug">{v.title}</p>
-                    <p className="text-xs text-surface-500 font-medium">{v.duration}</p>
+                    <p className="text-xs text-surface-500 font-medium">{v.duration || '—'}</p>
                   </div>
                   {watched.has(v.id) && (
                     <div className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-slate-800" />
@@ -292,7 +292,7 @@ export default function VideosPage() {
                   </p>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4">{v.dept}</Badge>
-                    <span className="text-xs text-surface-500 font-medium">{v.duration}</span>
+                    <span className="text-xs text-surface-500 font-medium">{v.duration || '—'}</span>
                   </div>
                 </div>
               </div>
