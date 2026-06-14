@@ -114,40 +114,40 @@ export default function VideosPage() {
           <Badge variant="default">{selectedVideo.dept}</Badge>
         </div>
 
-        <div className="bg-slate-900 rounded-2xl overflow-hidden relative" style={{ paddingBottom: '56.25%' }}>
-          <AnimatePresence mode="popLayout">
-            <motion.div 
-              key={selectedVideo.id}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center"
-            >
-              <div className="text-[80px] leading-none mb-4">{selectedVideo.thumb}</div>
-              <h2 className="text-white font-bold text-xl line-clamp-2 max-w-md">{selectedVideo.title}</h2>
-              <div className="mt-3 px-3 py-1 bg-white/20 text-white rounded-full text-sm font-medium border border-white/10">
-                {selectedVideo.duration}
-              </div>
-              
-              <button 
-                onClick={() => {
-                  if (selectedVideo.file_url) {
-                    window.open('http://localhost:3001' + selectedVideo.file_url, '_blank');
-                  } else {
-                    toast.info("Player sẽ được tích hợp với video thật");
+        {selectedVideo ? (
+          <div className="relative bg-slate-900 rounded-2xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
+            {selectedVideo.file_url ? (
+              <video
+                key={selectedVideo.id}
+                className="w-full h-full object-contain"
+                controls
+                autoPlay={false}
+                preload="metadata"
+                poster=""
+                onEnded={() => {
+                  if (!watched.has(selectedVideo.id)) {
+                    toggleWatched();
                   }
                 }}
-                className="mt-6 w-16 h-16 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center text-white transition-colors border border-white/10"
+                onError={(e) => console.error('Video error:', e)}
               >
-                <Play className="w-8 h-8 ml-1" />
-              </button>
-
-              <p className="text-white/50 text-sm mt-4 font-medium">
-                {selectedVideo.file_url ? 'Video thật sẽ được tích hợp player sau' : '▶ Demo player — tích hợp video thật ở giai đoạn sau'}
-              </p>
-            </motion.div>
-          </AnimatePresence>
-        </div>
+                <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url}`} type="video/mp4" />
+                <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url}`} type="video/webm" />
+                Trình duyệt không hỗ trợ video này.
+              </video>
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-white">
+                <span className="text-6xl">{selectedVideo.thumb || '🎬'}</span>
+                <p className="font-bold text-lg">{selectedVideo.title}</p>
+                <p className="text-white/50 text-sm">Video demo — chưa có file thật</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="bg-slate-900 rounded-2xl flex items-center justify-center text-white/40" style={{ aspectRatio: '16/9' }}>
+            Chọn video để xem
+          </div>
+        )}
 
         {/* Video info bar */}
         <div className="mt-5 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
@@ -160,6 +160,16 @@ export default function VideosPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {selectedVideo?.file_url && (
+              <a
+                href={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url}`}
+                download={selectedVideo.title}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-surface-100 hover:bg-surface-200 rounded-xl text-surface-700 text-sm font-semibold transition-colors"
+              >
+                <Download size={16} />
+                Tải xuống
+              </a>
+            )}
             <Button variant="ghost" icon={Share2} onClick={() => toast.success("Đã sao chép link!")}>Chia sẻ</Button>
             {watched.has(selectedVideo.id) ? (
               <Button variant="ghost" className="text-green-700 bg-green-50 hover:bg-green-100 border-none" icon={CheckCircle2} onClick={toggleWatched}>
@@ -239,7 +249,20 @@ export default function VideosPage() {
                 )}
               >
                 <div className="w-20 h-12 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 relative overflow-hidden text-2xl">
-                  {v.thumb}
+                  {v.file_url ? (
+                    <video
+                      className="w-full h-full object-cover"
+                      src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${v.file_url}`}
+                      preload="metadata"
+                      muted
+                      style={{ pointerEvents: 'none' }}
+                      onLoadedMetadata={(e) => {
+                        e.target.currentTime = 1;
+                      }}
+                    />
+                  ) : (
+                    v.thumb || '🎬'
+                  )}
                   {watched.has(v.id) && (
                     <div className="absolute inset-0 bg-green-500/80 flex items-center justify-center text-white backdrop-blur-[1px]">
                       <CheckCircle2 className="w-5 h-5" />
