@@ -28,7 +28,12 @@ export default function VideosPage() {
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [filterDept, setFilterDept] = useState('Tất cả');
-  
+  const [videoError, setVideoError] = useState(false);
+
+  useEffect(() => {
+    setVideoError(false);
+  }, [selectedVideo]);
+
   useEffect(() => {
     api.getDocuments({ type: 'Video' })
       .then(data => {
@@ -117,24 +122,36 @@ export default function VideosPage() {
         {selectedVideo ? (
           <div className="relative bg-slate-900 rounded-2xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
             {selectedVideo.file_url ? (
-              <video
-                key={selectedVideo.id}
-                className="w-full h-full object-contain"
-                controls
-                autoPlay={false}
-                preload="metadata"
-                poster=""
-                onEnded={() => {
-                  if (!watched.has(selectedVideo.id)) {
-                    toggleWatched();
-                  }
-                }}
-                onError={(e) => console.error('Video error:', e)}
-              >
-                <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url}`} type="video/mp4" />
-                <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url}`} type="video/webm" />
-                Trình duyệt không hỗ trợ video này.
-              </video>
+              videoError ? (
+                <div className="w-full h-full flex flex-col items-center justify-center gap-3 text-white">
+                  <span className="text-5xl">⚠️</span>
+                  <p className="font-medium">Không thể tải video</p>
+                  <p className="text-white/50 text-sm">File không tồn tại trên server</p>
+                  <a href={`http://localhost:3001${selectedVideo.file_url}`} target="_blank" rel="noreferrer" className="text-primary-400 text-sm underline">
+                    Thử mở trực tiếp
+                  </a>
+                </div>
+              ) : (
+                <video
+                  key={selectedVideo.id}
+                  className="w-full h-full object-contain"
+                  controls
+                  autoPlay={false}
+                  preload="metadata"
+                  poster=""
+                  onEnded={() => {
+                    if (!watched.has(selectedVideo.id)) {
+                      toggleWatched();
+                    }
+                  }}
+                  onError={() => setVideoError(true)}
+                  onLoadStart={() => setVideoError(false)}
+                >
+                  <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url}`} type="video/mp4" />
+                  <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url}`} type="video/webm" />
+                  Trình duyệt không hỗ trợ video này.
+                </video>
+              )
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-white">
                 <span className="text-6xl">{selectedVideo.thumb || '🎬'}</span>
