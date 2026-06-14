@@ -1,8 +1,6 @@
-import React from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { useLearning } from '@/context/LearningContext';
+import React, { useState, useEffect } from 'react';
 import { useToast } from '@/context/ToastContext';
-import { getAssignedModules } from '@/utils/permissions';
+import { api } from '@/utils/api';
 import { Button, Badge } from '@/components/ui';
 import { motion } from 'framer-motion';
 import { clsx } from 'clsx';
@@ -13,14 +11,38 @@ const ICON_MAP = {
 };
 
 export default function ProgressPage() {
-  const { user } = useAuth();
-  const { modules, updateProgress, toggleComplete } = useLearning();
   const toast = useToast();
 
-  const assignedModules = getAssignedModules(modules, user);
-  const completedCount = assignedModules.filter(m => m.progress === 100).length;
-  const totalModules = assignedModules.length;
-  const avgProgress = totalModules > 0 ? Math.round(assignedModules.reduce((s, m) => s + m.progress, 0) / totalModules) : 0;
+  const [modules, setModules] = useState([]);
+  const [stats, setStats] = useState({ total: 0, completed: 0, avgProgress: 0 });
+  const [loading, setLoading] = useState(true);
+
+  const loadProgress = async () => {
+    try {
+      const data = await api.getUserProgress();
+      setModules(data.modules || []);
+      setStats(data.stats || { total: 0, completed: 0, avgProgress: 0 });
+    } catch (err) {
+      toast.error('Không thể tải tiến độ');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadProgress(); }, []);
+
+  const handleToggleComplete = async (mod) => {
+    const newProgress = mod.progress === 100 ? 0 : 100;
+    try {
+      await api.updateProgress(mod.id, newProgress);
+      await loadProgress();
+      toast.success(newProgress === 100 ? '✅ Đánh dấu hoàn thành!' : 'Đã bỏ đánh dấu');
+    } catch (err) {
+      toast.error('Không thể cập nhật: ' + err.message);
+    }
+  };
+
+  const { total: totalModules, completed: completedCount, avgProgress } = stats;
 
   let motivationalText = "Hãy bắt đầu hành trình học tập! 🚀";
   if (avgProgress > 0 && avgProgress <= 30) motivationalText = "Khởi đầu tuyệt vời! Hãy giữ vững phong độ nhé. 🌟";
@@ -30,18 +52,13 @@ export default function ProgressPage() {
 
   const hasStarted = completedCount >= 1;
   const hasSiengHoc = completedCount >= 3;
-  const hasXuatSac = assignedModules.some(m => m.quizScore >= 90);
+  const hasXuatSac = modules.some(m => m.quiz_score >= 90);
   const hasTocDo = false;
   const hasHoanHao = avgProgress === 100;
 
-  const handleToggle = (m) => {
-    toggleComplete(m.id);
-    if (m.progress === 100) {
-      toast.info("Đã bỏ đánh dấu hoàn thành");
-    } else {
-      toast.success("Đã đánh dấu hoàn thành module!");
-    }
-  };
+  if (loading) return (
+    <div className="p-8 text-center text-slate-400">Đang tải tiến độ...</div>
+  );
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8 flex flex-col gap-8">
@@ -71,7 +88,7 @@ export default function ProgressPage() {
       {/* MODULE LIST */}
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-bold text-surface-900 mt-2">Chi tiết module</h2>
-        {assignedModules.map(m => {
+        {modules.map(m => {
           const ModIcon = ICON_MAP[m.icon] || BookOpen;
           let levelColor = 'bg-primary-400 text-white';
           let badgeColor = 'success';
@@ -101,7 +118,7 @@ export default function ProgressPage() {
                       />
                     </div>
                     <span className="text-xs font-semibold text-surface-600 w-8">{m.progress}%</span>
-                    <span className="hidden sm:inline text-xs text-surface-400 shrink-0">· {m.estimatedHours} giờ</span>
+                    <span className="hidden sm:inline text-xs text-surface-400 shrink-0">· {m.estimated_hours} giờ</span>
                   </div>
                 </div>
               </div>
@@ -109,11 +126,11 @@ export default function ProgressPage() {
                 {m.locked ? (
                   <Badge variant="default" className="bg-surface-100 text-surface-500">🔒 Khoá</Badge>
                 ) : m.progress === 100 ? (
-                  <Button variant="ghost" size="sm" className="bg-green-50 text-green-700 hover:bg-green-100 w-full sm:w-auto" onClick={() => handleToggle(m)}>
+                  <Button variant="ghost" size="sm" className="bg-green-50 text-green-700 hover:bg-green-100 w-full sm:w-auto" onClick={() => handleToggleComplete(m)}>
                     ✓ Hoàn thành
                   </Button>
                 ) : (
-                  <Button variant="secondary" size="sm" className="w-full sm:w-auto" onClick={() => handleToggle(m)}>
+                  <Button variant="secondary" size="sm" className="w-full sm:w-auto" onClick={() => handleToggleComplete(m)}>
                     Đánh dấu hoàn thành
                   </Button>
                 )}

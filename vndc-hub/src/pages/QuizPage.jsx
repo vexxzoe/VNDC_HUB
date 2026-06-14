@@ -11,7 +11,7 @@ import { clsx } from 'clsx';
 import {
   ClipboardList, CheckCircle2, Award, ArrowLeft, Clock,
   XCircle, Download, Rocket, HeartHandshake, TrendingUp,
-  Wrench, Crown, BookOpen
+  Wrench, Crown, BookOpen, Edit2, Trash2
 } from 'lucide-react';
 
 // ─── Icon / colour maps (reused from CoursesPage) ────────────────────────────
@@ -277,6 +277,226 @@ function QuizManager({ modules }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// MODULE MANAGER
+// ═══════════════════════════════════════════════════════════════════════════════
+const DEPT_OPTIONS = ['all', 'Kinh doanh', 'CSKH', 'Kỹ thuật', 'Nhân sự', 'Vận hành'];
+const LEVEL_OPTIONS = ['Cơ bản', 'Trung cấp', 'Nâng cao', 'Chuyên gia'];
+const ICON_OPTIONS = ['Rocket', 'HeartHandshake', 'TrendingUp', 'Wrench', 'Crown', 'Award', 'BookOpen'];
+
+const BLANK_MODULE_FORM = {
+  title: '', level: 'Cơ bản', department: ['all'],
+  lessons: 0, videos: 0, estimated_hours: 0, icon: 'BookOpen', locked: false,
+};
+
+function ModuleManager({ modules, setModules }) {
+  const toast = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [editingModule, setEditingModule] = useState(null);
+  const [form, setForm] = useState(BLANK_MODULE_FORM);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const openAdd = () => {
+    setEditingModule(null);
+    setForm(BLANK_MODULE_FORM);
+    setShowForm(true);
+  };
+
+  const openEdit = (mod) => {
+    setEditingModule(mod);
+    setForm({
+      title: mod.title,
+      level: mod.level,
+      department: typeof mod.department === 'string' ? JSON.parse(mod.department) : (mod.department || ['all']),
+      lessons: mod.lessons || 0,
+      videos: mod.videos || 0,
+      estimated_hours: mod.estimated_hours || 0,
+      icon: mod.icon || 'BookOpen',
+      locked: mod.locked || false,
+    });
+    setShowForm(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.title?.trim()) { toast.error('Tên module là bắt buộc'); return; }
+    setSaving(true);
+    try {
+      if (editingModule) {
+        await api.updateModule(editingModule.id, form);
+        toast.success('Đã cập nhật module');
+      } else {
+        await api.createModule(form);
+        toast.success('Đã tạo module mới');
+      }
+      const data = await api.getModules();
+      setModules(data.modules || []);
+      setShowForm(false);
+      setEditingModule(null);
+      setForm(BLANK_MODULE_FORM);
+    } catch (err) {
+      toast.error('Lỗi: ' + err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await api.deleteModule(id);
+      setModules(prev => prev.filter(m => m.id !== id));
+      setConfirmDeleteId(null);
+      toast.success('Đã xoá module');
+    } catch (err) {
+      toast.error('Lỗi xoá: ' + err.message);
+    }
+  };
+
+  const toggleDept = (d) => {
+    setForm(prev => {
+      const cur = prev.department || [];
+      if (d === 'all') return { ...prev, department: ['all'] };
+      const without = cur.filter(x => x !== 'all');
+      return { ...prev, department: without.includes(d) ? without.filter(x => x !== d) : [...without, d] };
+    });
+  };
+
+  const LEVEL_COLOR = {
+    'Cơ bản': 'bg-primary-50 text-primary-700 border-primary-200',
+    'Trung cấp': 'bg-blue-50 text-blue-700 border-blue-200',
+    'Nâng cao': 'bg-orange-50 text-orange-700 border-orange-200',
+    'Chuyên gia': 'bg-purple-50 text-purple-700 border-purple-200',
+  };
+
+  return (
+    <div className="mt-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-bold text-surface-900">Quản lý Module</h2>
+        <Button variant="primary" onClick={openAdd}>+ Thêm module</Button>
+      </div>
+
+      {showForm && (
+        <div className="bg-surface-50 border border-surface-200 rounded-2xl p-6 mb-6">
+          <h3 className="font-bold text-surface-900 mb-5">{editingModule ? 'Sửa module' : 'Thêm module mới'}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="sm:col-span-2">
+              <label className="text-xs font-semibold text-surface-500 mb-1 block">Tên module *</label>
+              <input className="w-full p-3 border rounded-xl text-sm" placeholder="Nhập tên module..."
+                value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-surface-500 mb-1 block">Cấp độ</label>
+              <select className="w-full p-3 border rounded-xl text-sm bg-white"
+                value={form.level} onChange={e => setForm({ ...form, level: e.target.value })}>
+                {LEVEL_OPTIONS.map(l => <option key={l}>{l}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-surface-500 mb-1 block">Icon</label>
+              <select className="w-full p-3 border rounded-xl text-sm bg-white"
+                value={form.icon} onChange={e => setForm({ ...form, icon: e.target.value })}>
+                {ICON_OPTIONS.map(i => <option key={i}>{i}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-surface-500 mb-1 block">Số bài học</label>
+              <input type="number" min={0} className="w-full p-3 border rounded-xl text-sm"
+                value={form.lessons} onChange={e => setForm({ ...form, lessons: +e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-surface-500 mb-1 block">Số video</label>
+              <input type="number" min={0} className="w-full p-3 border rounded-xl text-sm"
+                value={form.videos} onChange={e => setForm({ ...form, videos: +e.target.value })} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-surface-500 mb-1 block">Số giờ ước tính</label>
+              <input type="number" min={0} step={0.5} className="w-full p-3 border rounded-xl text-sm"
+                value={form.estimated_hours} onChange={e => setForm({ ...form, estimated_hours: +e.target.value })} />
+            </div>
+            <div className="flex items-center gap-3 pt-6">
+              <input type="checkbox" id="locked" checked={!!form.locked}
+                onChange={e => setForm({ ...form, locked: e.target.checked })} />
+              <label htmlFor="locked" className="text-sm font-semibold text-surface-700">Khoá module</label>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs font-semibold text-surface-500 mb-2 block">Phòng ban</label>
+              <div className="flex flex-wrap gap-2">
+                {DEPT_OPTIONS.map(d => (
+                  <button key={d} type="button" onClick={() => toggleDept(d)}
+                    className={clsx('px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors',
+                      (form.department || []).includes(d)
+                        ? 'bg-primary-600 text-white border-primary-600'
+                        : 'bg-white text-surface-600 border-surface-200 hover:border-primary-300'
+                    )}>
+                    {d === 'all' ? 'Toàn công ty' : d}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 mt-5">
+            <Button variant="secondary" onClick={() => { setShowForm(false); setEditingModule(null); }}>Huỷ</Button>
+            <Button variant="primary" onClick={handleSave} disabled={saving}>{saving ? 'Đang lưu...' : 'Lưu module'}</Button>
+          </div>
+        </div>
+      )}
+
+      <div className="flex flex-col gap-3">
+        {modules.map(mod => {
+          const ModIcon = ICON_MAP[mod.icon] || BookOpen;
+          const dept = typeof mod.department === 'string' ? JSON.parse(mod.department) : (mod.department || []);
+          return (
+            <div key={mod.id} className="bg-white border border-surface-200 rounded-xl p-4 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className={clsx('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+                  LEVEL_BAR[mod.level] ? LEVEL_BAR[mod.level].replace('bg-', 'bg-').split(' ')[0] : 'bg-surface-100'
+                )}>
+                  <ModIcon className="w-5 h-5 text-white" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-surface-900 text-sm">{mod.title}</span>
+                    <span className={clsx('text-xs px-2 py-0.5 rounded-full border font-semibold', LEVEL_COLOR[mod.level])}
+                    >{mod.level}</span>
+                    {mod.locked && <span className="text-xs text-surface-500">🔒 Khoá</span>}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {dept.map(d => (
+                      <span key={d} className="text-[10px] px-1.5 py-0.5 bg-surface-100 text-surface-500 rounded-md font-medium">
+                        {d === 'all' ? 'Toàn công ty' : d}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-xs text-surface-400 mt-1">{mod.lessons} bài · {mod.videos} video · {mod.estimated_hours} giờ</p>
+                </div>
+                <div className="shrink-0 flex items-center gap-1">
+                  <button onClick={() => openEdit(mod)} className="p-2 text-surface-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => setConfirmDeleteId(mod.id)} className="p-2 text-surface-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+              {confirmDeleteId === mod.id && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm">
+                  <p className="text-red-700 font-semibold mb-2">Xác nhận xoá module này? Tất cả câu hỏi quiz sẽ bị xoá.</p>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleDelete(mod.id)}
+                      className="px-3 py-1.5 bg-red-600 text-white text-xs font-semibold rounded-lg hover:bg-red-700">Xoá</button>
+                    <button onClick={() => setConfirmDeleteId(null)}
+                      className="px-3 py-1.5 bg-white border text-xs font-semibold rounded-lg hover:bg-surface-50">Huỷ</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function QuizPage() {
@@ -426,20 +646,32 @@ export default function QuizPage() {
             Làm Quiz
           </button>
           <button
-            onClick={() => setViewMode('manage')}
+            onClick={() => setViewMode('manage_quiz')}
             className={clsx('px-4 py-2 rounded-full text-sm font-semibold transition-colors',
-              viewMode === 'manage'
+              viewMode === 'manage_quiz'
                 ? 'bg-primary-600 text-white'
                 : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
             )}
           >
             Quản lý câu hỏi
           </button>
+          <button
+            onClick={() => setViewMode('manage_modules')}
+            className={clsx('px-4 py-2 rounded-full text-sm font-semibold transition-colors',
+              viewMode === 'manage_modules'
+                ? 'bg-primary-600 text-white'
+                : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+            )}
+          >
+            Quản lý module
+          </button>
         </div>
       )}
 
-      {viewMode === 'manage' ? (
+      {viewMode === 'manage_quiz' ? (
         <QuizManager modules={modules} />
+      ) : viewMode === 'manage_modules' ? (
+        <ModuleManager modules={modules} setModules={setModules} />
       ) : (
         <>
           <div className="grid grid-cols-3 gap-3 mt-5 mb-8">
@@ -503,6 +735,9 @@ export default function QuizPage() {
                   )}
                 </div>
               </div>
+            </div>
+          );
+        })}
       </div>
         </>
       )}

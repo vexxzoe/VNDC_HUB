@@ -76,6 +76,11 @@ export const api = {
   markVideoWatched:(videoId) =>
     request('POST', `/learning/videos/${videoId}/watch`),
 
+  // Module Manager (Admin)
+  createModule: (data) => request('POST', '/learning/modules', data),
+  updateModule: (id, data) => request('PUT', `/learning/modules/${id}`, data),
+  deleteModule: (id) => request('DELETE', `/learning/modules/${id}`),
+
   // Users
   getUsers:       (params = {}) =>
     request('GET', '/users?' + new URLSearchParams(params)),

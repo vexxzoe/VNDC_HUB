@@ -230,3 +230,103 @@ export async function markVideoWatched(req, res, next) {
     res.json({ watched: true, videoId: req.params.videoId })
   } catch (err) { next(err) }
 }
+
+// POST /api/learning/modules — Tạo module mới (Admin)
+export async function createModule(req, res, next) {
+  try {
+    const {
+      title, level = 'Cơ bản', department = ['all'],
+      lessons = 0, videos = 0, estimated_hours = 0,
+      icon = 'BookOpen', locked = false, order_index
+    } = req.body
+
+    if (!title?.trim())
+      return res.status(400).json({ error: 'Tên module là bắt buộc' })
+
+    const validLevels = ['Cơ bản', 'Trung cấp', 'Nâng cao', 'Chuyên gia']
+    if (!validLevels.includes(level))
+      return res.status(400).json({ error: 'Cấp độ không hợp lệ' })
+
+    const deptArr = Array.isArray(department) ? department : JSON.parse(department)
+
+    let orderIdx = order_index
+    if (orderIdx === undefined) {
+      const { rows } = await query(
+        'SELECT COALESCE(MAX(order_index), 0) + 1 as next FROM modules'
+      )
+      orderIdx = rows[0].next
+    }
+
+    const { rows } = await query(`
+      INSERT INTO modules
+        (title, level, department, lessons, videos,
+         estimated_hours, icon, locked, order_index)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      RETURNING *
+    `, [title.trim(), level, deptArr, lessons, videos,
+        estimated_hours, icon, locked, orderIdx])
+
+    await query(
+      'INSERT INTO activity_logs (action,entity_type,entity_name,user_id) VALUES ($1,$2,$3,$4)',
+      ['Tạo module', 'module', title, req.user.id]
+    )
+
+    res.status(201).json({ module: rows[0] })
+  } catch (err) { next(err) }
+}
+
+// PUT /api/learning/modules/:id — Sửa module (Admin)
+export async function updateModule(req, res, next) {
+  try {
+    const {
+      title, level, department, lessons,
+      videos, estimated_hours, icon, locked, order_index
+    } = req.body
+
+    const updates = []
+    const params = []
+
+    if (title) { params.push(title.trim()); updates.push(`title=$${params.length}`) }
+    if (level) { params.push(level); updates.push(`level=$${params.length}`) }
+    if (department) {
+      const arr = Array.isArray(department) ? department : JSON.parse(department)
+      params.push(arr); updates.push(`department=$${params.length}`)
+    }
+    if (lessons !== undefined) { params.push(lessons); updates.push(`lessons=$${params.length}`) }
+    if (videos !== undefined) { params.push(videos); updates.push(`videos=$${params.length}`) }
+    if (estimated_hours !== undefined) { params.push(estimated_hours); updates.push(`estimated_hours=$${params.length}`) }
+    if (icon) { params.push(icon); updates.push(`icon=$${params.length}`) }
+    if (locked !== undefined) { params.push(locked); updates.push(`locked=$${params.length}`) }
+    if (order_index !== undefined) { params.push(order_index); updates.push(`order_index=$${params.length}`) }
+
+    if (updates.length === 0)
+      return res.status(400).json({ error: 'Không có gì để cập nhật' })
+
+    updates.push('updated_at=NOW()')
+    params.push(req.params.id)
+
+    const { rows } = await query(
+      `UPDATE modules SET ${updates.join(',')} WHERE id=$${params.length} RETURNING *`,
+      params
+    )
+    if (!rows[0]) return res.status(404).json({ error: 'Module không tồn tại' })
+
+    res.json({ module: rows[0] })
+  } catch (err) { next(err) }
+}
+
+// DELETE /api/learning/modules/:id — Xoá module (Admin)
+export async function deleteModule(req, res, next) {
+  try {
+    await query('DELETE FROM quiz_questions WHERE module_id=$1', [req.params.id])
+    await query('DELETE FROM learning_progress WHERE module_id=$1', [req.params.id])
+    await query('DELETE FROM certificates WHERE module_id=$1', [req.params.id])
+    const { rows } = await query(
+      'DELETE FROM modules WHERE id=$1 RETURNING title',
+      [req.params.id]
+    )
+    if (!rows[0]) return res.status(404).json({ error: 'Module không tồn tại' })
+
+    res.json({ message: 'Đã xoá module: ' + rows[0].title })
+  } catch (err) { next(err) }
+}
