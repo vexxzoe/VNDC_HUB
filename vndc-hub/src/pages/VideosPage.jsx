@@ -4,7 +4,7 @@ import { useToast } from '@/context/ToastContext';
 import { Badge, Button } from '@/components/ui';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
-import { Eye, Clock, Share2, Play, CheckCircle2 } from 'lucide-react';
+import { Eye, Clock, Share2, Play, CheckCircle2, Download } from 'lucide-react';
 import { api } from '@/utils/api';
 
 const VIDEOS_FALLBACK = [
