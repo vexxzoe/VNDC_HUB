@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Badge, Button } from '@/components/ui';
@@ -6,17 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { normalizeAudience } from '@/utils/permissions';
 import { Search, FileText, Table2, BookOpen, Download, ExternalLink, Share2, Edit, Link2, Info, Calendar, Tag, Users } from 'lucide-react';
-
-const FORMS = [
-  { id:"f1", name:"BM-09: Đổi trả hàng",           type:"PDF",    dept:"Vận hành",   audience:["all"],              version:"v1.1", updatedAt:"2025-05-20", desc:"Biểu mẫu xử lý yêu cầu đổi trả từ khách hàng. Áp dụng cho tất cả phòng ban liên quan đến dịch vụ khách hàng." },
-  { id:"f2", name:"BM-15: Đơn xin nghỉ phép",      type:"PDF",    dept:"Nhân sự",    audience:["all"],              version:"v1.0", updatedAt:"2025-01-10", desc:"Mẫu đơn xin nghỉ phép năm, nghỉ ốm, nghỉ không lương. Nộp trước 3 ngày làm việc." },
-  { id:"f3", name:"BM-03: Báo cáo công việc tuần", type:"Excel",  dept:"Vận hành",   audience:["all"],              version:"v2.0", updatedAt:"2025-04-15", desc:"Template báo cáo kết quả công việc tuần. Gửi cho quản lý trực tiếp trước 17h thứ Sáu." },
-  { id:"f4", name:"QT-01: Quy trình bán hàng",     type:"PDF",    dept:"Kinh doanh", audience:["Kinh doanh"],       version:"v3.1", updatedAt:"2025-05-01", desc:"Quy trình chuẩn từ tiếp cận khách hàng đến chốt đơn. Bắt buộc áp dụng cho toàn bộ nhân viên kinh doanh." },
-  { id:"f5", name:"QT-03: Xử lý khiếu nại",        type:"PDF",    dept:"CSKH",       audience:["CSKH","Kinh doanh"],version:"v1.5", updatedAt:"2025-04-30", desc:"Quy trình tiếp nhận và xử lý phản hồi, khiếu nại từ khách hàng trong vòng 24 giờ." },
-  { id:"f6", name:"QT-05: Kiểm tra kỹ thuật",      type:"PDF",    dept:"Kỹ thuật",   audience:["Kỹ thuật"],         version:"v2.2", updatedAt:"2025-03-20", desc:"Quy trình kiểm tra định kỳ thiết bị và hệ thống. Thực hiện hàng tháng." },
-  { id:"f7", name:"BM-22: Đề xuất mua sắm",        type:"Excel",  dept:"Vận hành",   audience:["all"],              version:"v1.0", updatedAt:"2025-02-28", desc:"Mẫu đề xuất mua sắm thiết bị, vật tư. Cần được duyệt bởi quản lý phòng ban và ban giám đốc." },
-  { id:"f8", name:"QT-08: Onboarding nhân viên",   type:"Module", dept:"Nhân sự",    audience:["all"],              version:"v1.2", updatedAt:"2025-05-12", desc:"Quy trình hội nhập nhân viên mới trong 30 ngày đầu. Trách nhiệm của HR và quản lý trực tiếp." },
-];
+import { api } from '@/utils/api';
 
 const TYPES = ['Tất cả', 'PDF', 'Excel', 'Module'];
 
@@ -35,27 +26,50 @@ const COLOR_MAP = {
 export default function FormsPage() {
   const { isAdmin } = useAuth();
   const toast = useToast();
+  const navigate = useNavigate();
 
+  const [forms, setForms] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedForm, setSelectedForm] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('Tất cả');
 
+  useEffect(() => {
+    Promise.all([
+      api.getDocuments({ tag: 'bieu-mau' }),
+      api.getDocuments({ tag: 'quy-trinh' }),
+    ]).then(([bm, qt]) => {
+      const all = [
+        ...(bm.documents || []),
+        ...(qt.documents || []),
+      ]
+      const unique = all.filter(
+        (d, i, arr) => arr.findIndex(x => x.id === d.id) === i
+      )
+      unique.sort((a, b) =>
+        new Date(b.updated_at) - new Date(a.updated_at)
+      )
+      setForms(unique)
+    })
+    .catch(() => toast.error('Không thể tải biểu mẫu'))
+    .finally(() => setLoading(false))
+  }, [])
 
-
-  const filteredForms = FORMS.filter(f => {
+  const filteredForms = forms.filter(f => {
+    const desc = f.tag || '';
     const matchSearch = f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                        f.desc.toLowerCase().includes(searchQuery.toLowerCase());
+                        desc.toLowerCase().includes(searchQuery.toLowerCase());
     const matchType = filterType === 'Tất cả' || f.type === filterType;
     return matchSearch && matchType;
   });
 
   const getRelated = (form) => {
     if (!form) return [];
-    return FORMS.filter(f => {
+    return forms.filter(f => {
       if (f.id === form.id) return false;
-      const fAudience = normalizeAudience(f.audience);
-      const formAudience = normalizeAudience(form.audience);
-      return f.dept === form.dept || fAudience.some(a => formAudience.includes(a));
+      const fAudience = normalizeAudience(f.audience || []);
+      const formAudience = normalizeAudience(form.audience || []);
+      return f.department === form.department || fAudience.some(a => formAudience.includes(a));
     }).slice(0, 3);
   };
 
@@ -66,13 +80,33 @@ export default function FormsPage() {
     return "";
   };
 
+  if (loading) return (
+    <div className="p-8 text-center text-slate-400">
+      Đang tải biểu mẫu...
+    </div>
+  )
+
+  if (forms.length === 0) return (
+    <div className="flex flex-col items-center justify-center min-h-64 gap-3 text-slate-400">
+      <FileText size={48} strokeWidth={1} />
+      <p className="font-500 text-slate-600">Chưa có biểu mẫu</p>
+      <p className="text-sm text-center">
+        Upload biểu mẫu tại trang
+        <span className="text-primary-600 ml-1 cursor-pointer" onClick={() => navigate('/updates')}>
+          Cập nhật tài liệu
+        </span>
+        với tag "bieu-mau" hoặc "quy-trinh"
+      </p>
+    </div>
+  )
+
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row gap-6">
       {/* SIDEBAR LIST */}
       <div className="w-full md:w-80 flex-shrink-0 bg-white border border-surface-200 rounded-2xl overflow-hidden md:sticky md:top-20 h-fit flex flex-col max-h-[800px] shadow-sm">
         <div className="px-4 py-3 border-b border-surface-100 bg-surface-50 flex items-center justify-between">
           <h3 className="font-semibold text-surface-900">Biểu mẫu & Quy trình</h3>
-          <Badge variant="default" className="text-[10px] text-surface-500 bg-surface-100">{FORMS.length} tài liệu</Badge>
+          <Badge variant="default" className="text-[10px] text-surface-500 bg-surface-100">{forms.length} tài liệu</Badge>
         </div>
 
         <div className="px-3 py-3 border-b border-surface-100 relative bg-white">
@@ -120,7 +154,7 @@ export default function FormsPage() {
                 <div className="flex-1 min-w-0">
                   <p className={clsx("text-sm font-semibold line-clamp-1", isActive ? "text-primary-700" : "text-surface-900")}>{f.name}</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4">{f.dept}</Badge>
+                    <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4">{f.department}</Badge>
                     <span className="text-xs text-surface-500 font-medium">{f.version}</span>
                   </div>
                 </div>
@@ -168,23 +202,29 @@ export default function FormsPage() {
                     <h2 className="text-2xl font-bold text-surface-900 leading-tight">{selectedForm.name}</h2>
                     <div className="flex flex-wrap gap-2 mt-3">
                       <Badge variant="outline" className="text-xs font-semibold px-2 py-0.5">{selectedForm.type}</Badge>
-                      <Badge variant="default" className="text-xs font-semibold px-2 py-0.5">{selectedForm.dept}</Badge>
+                      <Badge variant="default" className="text-xs font-semibold px-2 py-0.5">{selectedForm.department}</Badge>
                     </div>
                   </div>
                 </div>
                 
                 <div className="flex flex-wrap gap-5 text-sm text-surface-500 font-medium mt-6 bg-surface-50 p-4 rounded-xl border border-surface-100">
-                  <div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-surface-400" /> Cập nhật: {selectedForm.updatedAt}</div>
+                  <div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-surface-400" /> Cập nhật: {selectedForm.updated_at ? new Date(selectedForm.updated_at).toLocaleDateString('vi-VN') : '—'}</div>
                   <div className="flex items-center gap-2"><Tag className="w-4 h-4 text-surface-400" /> {selectedForm.version}</div>
-                  <div className="flex items-center gap-2"><Users className="w-4 h-4 text-surface-400" /> {selectedForm.audience.map(a => a==='all'?'Toàn công ty':a).join(", ")}</div>
+                  <div className="flex items-center gap-2"><Users className="w-4 h-4 text-surface-400" /> {(selectedForm.audience || []).map(a => a==='all'?'Toàn công ty':a).join(", ")}</div>
                 </div>
 
                 <div className="mt-6 p-5 bg-white border border-surface-100 rounded-xl text-sm leading-relaxed text-surface-700 shadow-sm font-medium">
-                  {selectedForm.desc}
+                  {selectedForm.tag || 'Chưa có mô tả'}
                 </div>
 
                 <div className="mt-6 flex flex-wrap gap-3">
-                  <Button variant="primary" icon={Download} onClick={() => toast.success(`Đang tải ${selectedForm.name}...`)}>Tải xuống</Button>
+                  <Button variant="primary" icon={Download} onClick={() => {
+                    if (selectedForm.file_url) {
+                      window.open('http://localhost:3001' + selectedForm.file_url, '_blank')
+                    } else {
+                      toast.info('File chưa được đính kèm')
+                    }
+                  }}>Tải xuống</Button>
                   <Button variant="secondary" icon={ExternalLink} onClick={() => toast.info("Trình xem sẽ được tích hợp sau")}>Mở xem trước</Button>
                   <Button variant="ghost" icon={Share2} onClick={() => toast.success("Đã sao chép link!")}>Chia sẻ</Button>
                   {isAdmin && <Button variant="ghost" icon={Edit} className="text-surface-500">Chỉnh sửa</Button>}
@@ -209,7 +249,7 @@ export default function FormsPage() {
                       <div className="flex-1 min-w-0 flex flex-col justify-center">
                         <p className="font-semibold text-sm text-surface-900 line-clamp-1 group-hover:text-primary-700 transition-colors">{r.name}</p>
                         <div className="flex gap-2 mt-1.5">
-                          <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4">{r.dept}</Badge>
+                          <Badge variant="default" className="text-[9px] px-1.5 py-0 h-4">{r.department}</Badge>
                           <Badge variant="outline" className="text-[9px] px-1.5 py-0 h-4">{r.type}</Badge>
                         </div>
                       </div>

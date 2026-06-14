@@ -6,7 +6,7 @@ import path from 'path'
 // GET /api/documents
 export async function getDocuments(req, res, next) {
   try {
-    const { department, type, search, bookmarked } = req.query
+    const { department, type, search, bookmarked, tag } = req.query
     const user = req.user
 
     let sql = `
@@ -46,6 +46,10 @@ export async function getDocuments(req, res, next) {
     }
     if (bookmarked === 'true') {
       sql += ` AND b.user_id IS NOT NULL`
+    }
+    if (tag) {
+      params.push(tag)
+      sql += ` AND d.tag = $${params.length}`
     }
 
     sql += ` ORDER BY d.updated_at DESC`
