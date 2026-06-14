@@ -54,7 +54,7 @@ services:
       UPLOAD_DIR: /app/uploads
       GROQ_API_KEY: ${GROQ_API_KEY}
     volumes:
-      - ./uploads:/app/uploads
+      - vndc_hub_uploads:/app/uploads
     depends_on:
       vndc_hub_db:
         condition: service_healthy
@@ -66,3 +66,5 @@ volumes:
     name: vndc_hub_db_data
   vndc_hub_redis_data:
     name: vndc_hub_redis_data
+  vndc_hub_uploads:
+    name: vndc_hub_uploads
