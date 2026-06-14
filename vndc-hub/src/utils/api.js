@@ -66,6 +66,12 @@ export const api = {
     request('POST', `/learning/modules/${id}/quiz/submit`, { answers }),
   getCertificate:  (id) => request('GET', `/learning/modules/${id}/certificate`),
   getUserProgress: () => request('GET', '/learning/progress'),
+  
+  // Quiz Manager
+  getQuestionsAdmin: (moduleId) => request('GET', `/quiz/modules/${moduleId}/questions`),
+  createQuestion: (moduleId, data) => request('POST', `/quiz/modules/${moduleId}/questions`, data),
+  updateQuestion: (id, data) => request('PUT', `/quiz/questions/${id}`, data),
+  deleteQuestion: (id) => request('DELETE', `/quiz/questions/${id}`),
   getVideoStatus:  () => request('GET', '/learning/videos/status'),
   markVideoWatched:(videoId) =>
     request('POST', `/learning/videos/${videoId}/watch`),

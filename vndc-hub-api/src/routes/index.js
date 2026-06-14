@@ -7,6 +7,7 @@ import aiRoutes from './ai.routes.js'
 import notificationsRoutes from './notifications.routes.js'
 import updatesRoutes from './updates.routes.js'
 import analyticsRoutes from './analytics.routes.js'
+import quizRoutes from './quiz.routes.js'
 
 const router = Router()
 
@@ -28,5 +29,6 @@ router.use('/ai', aiRoutes)
 router.use('/notifications', notificationsRoutes)
 router.use('/updates', updatesRoutes)
 router.use('/analytics', analyticsRoutes)
+router.use('/quiz', quizRoutes)
 
 export default router

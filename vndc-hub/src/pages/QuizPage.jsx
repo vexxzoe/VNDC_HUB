@@ -121,6 +121,161 @@ function CertModal({ open, onClose, user, module, score }) {
   );
 }
 
+// ─── Quiz Manager ─────────────────────────────────────────────────────────────
+function QuizManager({ modules }) {
+  const toast = useToast();
+  const [selectedModuleId, setSelectedModuleId] = useState(null);
+  const [questions, setQuestions] = useState([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newQuestion, setNewQuestion] = useState({
+    question: '',
+    options: ['', '', '', ''],
+    answer: 0,
+  });
+  const [editingId, setEditingId] = useState(null);
+
+  const loadQuestions = async (moduleId) => {
+    try {
+      const data = await api.getQuestionsAdmin(moduleId);
+      setQuestions(data.questions || []);
+      setSelectedModuleId(moduleId);
+      setShowAddForm(false);
+      setEditingId(null);
+    } catch (err) {
+      toast.error('Không thể tải câu hỏi: ' + err.message);
+    }
+  };
+
+  const handleAddQuestion = async () => {
+    try {
+      if (!newQuestion.question.trim()) return toast.error('Vui lòng nhập câu hỏi');
+      if (newQuestion.options.some(o => !o.trim())) return toast.error('Vui lòng nhập đủ 4 đáp án');
+      
+      if (editingId) {
+        await api.updateQuestion(editingId, newQuestion);
+        toast.success('Đã cập nhật câu hỏi');
+      } else {
+        await api.createQuestion(selectedModuleId, newQuestion);
+        toast.success('Đã thêm câu hỏi');
+      }
+      
+      setNewQuestion({ question: '', options: ['', '', '', ''], answer: 0 });
+      setShowAddForm(false);
+      setEditingId(null);
+      loadQuestions(selectedModuleId);
+    } catch (err) {
+      toast.error('Lỗi: ' + err.message);
+    }
+  };
+
+  const handleDeleteQuestion = async (id) => {
+    if (!window.confirm('Xoá câu hỏi này?')) return;
+    try {
+      await api.deleteQuestion(id);
+      toast.success('Đã xoá');
+      loadQuestions(selectedModuleId);
+    } catch (err) {
+      toast.error('Lỗi: ' + err.message);
+    }
+  };
+
+  const editQuestion = (q) => {
+    setNewQuestion({
+      question: q.question,
+      options: typeof q.options === 'string' ? JSON.parse(q.options) : q.options,
+      answer: q.answer
+    });
+    setEditingId(q.id);
+    setShowAddForm(true);
+  };
+
+  return (
+    <div className="flex flex-col md:flex-row gap-6 mt-6">
+      {/* Sidebar Modules */}
+      <div className="w-full md:w-1/3 bg-white border border-surface-200 rounded-2xl p-4 self-start shadow-sm h-[600px] overflow-y-auto">
+        <h3 className="font-bold text-surface-900 mb-4">Danh sách Module</h3>
+        <div className="flex flex-col gap-2">
+          {modules.map(mod => (
+            <button
+              key={mod.id}
+              onClick={() => loadQuestions(mod.id)}
+              className={clsx('text-left px-4 py-3 rounded-xl text-sm font-medium transition-colors border',
+                selectedModuleId === mod.id ? 'bg-primary-50 border-primary-200 text-primary-700' : 'bg-surface-50 border-surface-100 text-surface-700 hover:bg-surface-100'
+              )}
+            >
+              {mod.title}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="w-full md:w-2/3 bg-white border border-surface-200 rounded-2xl p-6 shadow-sm min-h-[600px]">
+        {!selectedModuleId ? (
+          <div className="text-center text-surface-500 mt-20">Chọn 1 module để quản lý câu hỏi</div>
+        ) : (
+          <>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-surface-900 text-lg">Danh sách câu hỏi ({questions.length})</h3>
+              <Button variant="primary" onClick={() => { setShowAddForm(true); setEditingId(null); setNewQuestion({ question: '', options: ['', '', '', ''], answer: 0 }); }}>+ Thêm câu hỏi</Button>
+            </div>
+
+            {showAddForm && (
+              <div className="bg-surface-50 border border-surface-200 p-5 rounded-xl mb-6">
+                <h4 className="font-bold mb-4">{editingId ? 'Sửa câu hỏi' : 'Thêm câu hỏi mới'}</h4>
+                <textarea
+                  className="w-full p-3 border rounded-xl mb-4 text-sm" rows={3} placeholder="Nội dung câu hỏi..."
+                  value={newQuestion.question} onChange={e => setNewQuestion({...newQuestion, question: e.target.value})}
+                />
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  {newQuestion.options.map((opt, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input type="radio" name="answer" checked={newQuestion.answer === i} onChange={() => setNewQuestion({...newQuestion, answer: i})} />
+                      <input className="flex-1 p-2 border rounded-lg text-sm" placeholder={`Đáp án ${i+1}`} value={opt} onChange={e => {
+                        const newOpts = [...newQuestion.options];
+                        newOpts[i] = e.target.value;
+                        setNewQuestion({...newQuestion, options: newOpts});
+                      }} />
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="secondary" onClick={() => { setShowAddForm(false); setEditingId(null); }}>Huỷ</Button>
+                  <Button variant="primary" onClick={handleAddQuestion}>Lưu</Button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-4">
+              {questions.map((q, i) => {
+                const opts = typeof q.options === 'string' ? JSON.parse(q.options) : q.options;
+                return (
+                  <div key={q.id} className="border border-surface-200 p-4 rounded-xl">
+                    <div className="flex justify-between items-start mb-3">
+                      <p className="font-bold text-surface-900 text-sm">Câu {i + 1}: {q.question}</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => editQuestion(q)} className="text-xs text-primary-600 font-semibold">Sửa</button>
+                        <button onClick={() => handleDeleteQuestion(q.id)} className="text-xs text-red-600 font-semibold">Xoá</button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                      {opts.map((opt, idx) => (
+                        <div key={idx} className={clsx("p-2 rounded-lg border", q.answer === idx ? "bg-green-50 border-green-200 text-green-700 font-semibold" : "bg-surface-50 border-surface-100 text-surface-600")}>
+                          {String.fromCharCode(65 + idx)}. {opt}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -140,6 +295,7 @@ export default function QuizPage() {
   }, []);
 
   const [phase, setPhase]               = useState('select');
+  const [viewMode, setViewMode]         = useState('take');
   const [selectedModule, setSelectedModule] = useState(null);
   const [currentQ, setCurrentQ]         = useState(0);
   const [answers, setAnswers]           = useState({});
@@ -257,8 +413,37 @@ export default function QuizPage() {
       <h1 className="text-2xl font-bold text-surface-900">Quiz & Chứng nhận</h1>
       <p className="text-sm text-surface-500 font-medium mt-1">Kiểm tra kiến thức và nhận chứng nhận hoàn thành</p>
 
-      <div className="grid grid-cols-3 gap-3 mt-5 mb-8">
-        <StatCard icon={ClipboardList} label="Modules" value={assignedModules.length} />
+      {user?.role === 'admin' && (
+        <div className="flex gap-2 mt-6">
+          <button
+            onClick={() => setViewMode('take')}
+            className={clsx('px-4 py-2 rounded-full text-sm font-semibold transition-colors',
+              viewMode === 'take'
+                ? 'bg-primary-600 text-white'
+                : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+            )}
+          >
+            Làm Quiz
+          </button>
+          <button
+            onClick={() => setViewMode('manage')}
+            className={clsx('px-4 py-2 rounded-full text-sm font-semibold transition-colors',
+              viewMode === 'manage'
+                ? 'bg-primary-600 text-white'
+                : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+            )}
+          >
+            Quản lý câu hỏi
+          </button>
+        </div>
+      )}
+
+      {viewMode === 'manage' ? (
+        <QuizManager modules={modules} />
+      ) : (
+        <>
+          <div className="grid grid-cols-3 gap-3 mt-5 mb-8">
+            <StatCard icon={ClipboardList} label="Modules" value={assignedModules.length} />
         <StatCard icon={CheckCircle2} label="Đã làm" value={doneCount} accent="success" />
         <StatCard icon={Award} label="Điểm TB" value={avgScore !== null ? avgScore : '—'} accent="primary" />
       </div>
@@ -318,10 +503,9 @@ export default function QuizPage() {
                   )}
                 </div>
               </div>
-            </div>
-          );
-        })}
       </div>
+        </>
+      )}
     </div>
   );
 
