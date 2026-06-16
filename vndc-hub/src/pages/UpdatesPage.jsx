@@ -12,6 +12,8 @@ import {
   ClipboardList, Eye, Bell
 } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
 const INITIAL_TASKS = [
@@ -119,7 +121,7 @@ export default function UpdatesPage() {
 
         const token = JSON.parse(localStorage.getItem('vndc_user') || '{}')?.token
         const res = await fetch(
-          (import.meta.env.VITE_API_URL || 'http://localhost:3001') + '/api/updates',
+          `${API_URL}/api/updates`,
           {
             method: 'POST',
             headers: { Authorization: 'Bearer ' + token },
