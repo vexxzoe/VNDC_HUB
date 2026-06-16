@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import DocumentViewer from '@/components/ui/DocumentViewer';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 const DEPARTMENTS = ['Tất cả', 'Chung', 'Kinh doanh', 'CSKH', 'Kỹ thuật', 'Vận hành', 'Nhân sự'];
 const TYPES = [
   { id: 'all', label: 'Tất cả' },
@@ -142,15 +144,11 @@ export default function LibraryPage() {
       formData.append('audience', JSON.stringify(['all']));
       formData.append('tag', '');
 
-      const token = JSON.parse(localStorage.getItem('vndc_user') || '{}')?.token;
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}/api/documents`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData, // KHÔNG set Content-Type — browser tự set boundary
-        }
-      );
+      const response = await fetch(`${API_URL}/api/documents`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${user.token}` },
+        body: formData, // KHÔNG set Content-Type — browser tự set boundary
+      });
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -352,7 +350,7 @@ export default function LibraryPage() {
                       onClick={() => {
                         if (activeDoc.file_url) {
                           const link = document.createElement('a');
-                          link.href = `${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${activeDoc.file_url}`;
+                          link.href = `${API_URL}${activeDoc.file_url}`;
                           link.download = activeDoc.name || 'document';
                           link.target = '_blank';
                           document.body.appendChild(link);

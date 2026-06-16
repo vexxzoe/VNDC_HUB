@@ -20,14 +20,13 @@ const VIDEOS_FALLBACK = [
 
 const DEPARTMENTS = ['Tất cả', 'Chung', 'Kinh doanh', 'CSKH', 'Kỹ thuật'];
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 // Component tạo thumbnail từ video bằng Canvas API
 const VideoThumb = ({ fileUrl, title }) => {
   const videoRef = useRef(null)
   const canvasRef = useRef(null)
   const [thumbReady, setThumbReady] = useState(false)
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
   useEffect(() => {
     if (!fileUrl) return
@@ -197,7 +196,7 @@ export default function VideosPage() {
                   <span className="text-5xl">⚠️</span>
                   <p className="font-medium">Không thể tải video</p>
                   <p className="text-white/50 text-sm">File không tồn tại trên server</p>
-                  <a href={`http://localhost:3001${selectedVideo.file_url}`} target="_blank" rel="noreferrer" className="text-primary-400 text-sm underline">
+                  <a href={`${API_URL}${selectedVideo.file_url}`} target="_blank" rel="noreferrer" className="text-primary-400 text-sm underline">
                     Thử mở trực tiếp
                   </a>
                 </div>
@@ -217,8 +216,8 @@ export default function VideosPage() {
                   onError={() => setVideoError(true)}
                   onLoadStart={() => setVideoError(false)}
                 >
-                  <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url.replace(/\.mp4$/i, '.stream')}`} type="video/mp4" />
-                  <source src={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url.replace(/\.webm$/i, '.stream')}`} type="video/webm" />
+                  <source src={`${API_URL}${selectedVideo.file_url.replace(/\.mp4$/i, '.stream')}`} type="video/mp4" />
+                  <source src={`${API_URL}${selectedVideo.file_url.replace(/\.webm$/i, '.stream')}`} type="video/webm" />
                   Trình duyệt không hỗ trợ video này.
                 </video>
               )
@@ -249,7 +248,7 @@ export default function VideosPage() {
           <div className="flex items-center gap-2">
             {selectedVideo?.file_url && (
               <a
-                href={`${import.meta.env.VITE_API_URL || 'http://localhost:3001'}${selectedVideo.file_url}`}
+                href={`${API_URL}${selectedVideo.file_url}`}
                 download={selectedVideo.title}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-surface-100 hover:bg-surface-200 rounded-xl text-surface-700 text-sm font-semibold transition-colors"
               >

@@ -10,6 +10,8 @@ import { normalizeAudience } from '@/utils/permissions';
 import { Search, FileText, Table2, BookOpen, Download, ExternalLink, Share2, Edit, Link2, Info, Calendar, Tag, Users } from 'lucide-react';
 import { api } from '@/utils/api';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 const TYPES = ['Tất cả', 'PDF', 'Excel', 'Module'];
 
 const ICON_MAP = {
@@ -232,7 +234,7 @@ export default function FormsPage() {
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Button variant="primary" icon={Download} onClick={() => {
                     if (selectedForm.file_url) {
-                      window.open('http://localhost:3001' + selectedForm.file_url, '_blank')
+                      window.open(API_URL + selectedForm.file_url, '_blank')
                     } else {
                       toast.info('File chưa được đính kèm')
                     }
