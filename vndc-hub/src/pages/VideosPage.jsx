@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Badge, Button } from '@/components/ui';
@@ -23,54 +23,70 @@ const DEPARTMENTS = ['Tất cả', 'Chung', 'Kinh doanh', 'CSKH', 'Kỹ thuật'
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 // Component tạo thumbnail từ video bằng Canvas API
-// Dùng thuộc tính crossOrigin + toDataURL để capture frame mà không bị IDM can thiệp
-function VideoThumb({ fileUrl }) {
-  const canvasRef = React.useRef(null);
-  const [captured, setCaptured] = React.useState(false);
-  const [failed, setFailed] = React.useState(false);
+const VideoThumb = ({ fileUrl, title }) => {
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const [thumbReady, setThumbReady] = useState(false)
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
-  React.useEffect(() => {
-    if (!fileUrl) return;
-    const video = document.createElement('video');
-    video.crossOrigin = 'anonymous';
-    video.muted = true;
-    video.preload = 'metadata';
-    // Dùng .stream để tránh IDM bắt
-    video.src = `${API_BASE}${fileUrl.replace(/\.(mp4|webm)$/i, '.stream')}`;
+  useEffect(() => {
+    if (!fileUrl) return
+    const video = document.createElement('video')
+    video.crossOrigin = 'anonymous'
+    video.muted = true
+    video.preload = 'metadata'
+
+    // Dùng .stream để bypass IDM
+    const streamUrl = `${API_URL}${fileUrl.replace('.mp4', '.stream')}`
+    video.src = streamUrl
 
     video.addEventListener('loadeddata', () => {
-      video.currentTime = 1.5;
-    });
-    video.addEventListener('seeked', () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      canvas.width = video.videoWidth || 320;
-      canvas.height = video.videoHeight || 180;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      setCaptured(true);
-      video.src = '';
-      video.load();
-    });
-    video.addEventListener('error', () => setFailed(true));
-    video.load();
-    return () => { video.src = ''; video.load(); };
-  }, [fileUrl]);
+      video.currentTime = 1.5
+    })
 
-  if (failed) return <span className="text-2xl">🎬</span>;
+    video.addEventListener('seeked', () => {
+      try {
+        const canvas = canvasRef.current
+        if (!canvas) return
+        canvas.width = video.videoWidth || 320
+        canvas.height = video.videoHeight || 180
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        setThumbReady(true)
+      } catch (e) {
+        // CORS block → dùng fallback
+        setThumbReady(false)
+      }
+    })
+
+    video.addEventListener('error', () => setThumbReady(false))
+    video.load()
+
+    return () => {
+      video.src = ''
+    }
+  }, [fileUrl])
 
   return (
-    <>
+    <div className="relative w-full h-full bg-slate-800
+                    flex items-center justify-center overflow-hidden">
       <canvas
         ref={canvasRef}
-        className="w-full h-full object-cover"
-        style={{ display: captured ? 'block' : 'none' }}
+        className={clsx(
+          'w-full h-full object-cover',
+          thumbReady ? 'block' : 'hidden'
+        )}
       />
-      {!captured && (
-        <span className="text-2xl">🎬</span>
+      {!thumbReady && (
+        <div className="flex flex-col items-center gap-1 text-white/60">
+          <span className="text-2xl">🎬</span>
+          <span className="text-[10px] text-center px-1 line-clamp-2">
+            {title}
+          </span>
+        </div>
       )}
-    </>
-  );
+    </div>
+  )
 }
 
 
@@ -319,11 +335,13 @@ export default function VideosPage() {
                   isActive && "bg-primary-50 lg:border-l-2 lg:border-t-0 border-b-2 lg:border-b-primary-50 border-primary-600"
                 )}
               >
-                <div className="w-20 h-12 rounded-lg bg-slate-800 flex items-center justify-center flex-shrink-0 relative overflow-hidden text-2xl">
+                <div className="w-16 h-10 rounded-lg overflow-hidden flex-shrink-0 relative">
                   {v.file_url ? (
-                    <VideoThumb fileUrl={v.file_url} />
+                    <VideoThumb fileUrl={v.file_url} title={v.title} />
                   ) : (
-                    v.thumb || '🎬'
+                    <div className="w-full h-full bg-slate-800 flex items-center justify-center text-xl">
+                      {v.thumb || '🎬'}
+                    </div>
                   )}
                   {watched.has(v.id) && (
                     <div className="absolute inset-0 bg-green-500/80 flex items-center justify-center text-white backdrop-blur-[1px]">

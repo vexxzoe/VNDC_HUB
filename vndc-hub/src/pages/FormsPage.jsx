@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { Badge, Button } from '@/components/ui';
+import { Badge, Button, Modal } from '@/components/ui';
+import DocumentViewer from '@/components/ui/DocumentViewer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { normalizeAudience } from '@/utils/permissions';
@@ -33,26 +34,37 @@ export default function FormsPage() {
   const [selectedForm, setSelectedForm] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('Tất cả');
+  const [previewForm, setPreviewForm] = useState(null);
 
-  useEffect(() => {
-    Promise.all([
-      api.getDocuments({ tag: 'bieu-mau' }),
-      api.getDocuments({ tag: 'quy-trinh' }),
-    ]).then(([bm, qt]) => {
-      const all = [
-        ...(bm.documents || []),
-        ...(qt.documents || []),
-      ]
+  const loadForms = async () => {
+    setLoading(true)
+    try {
+      const [bm, qt] = await Promise.all([
+        api.getDocuments({ tag: 'bieu-mau' }),
+        api.getDocuments({ tag: 'quy-trinh' }),
+      ])
+      const all = [...(bm.documents||[]), ...(qt.documents||[])]
       const unique = all.filter(
-        (d, i, arr) => arr.findIndex(x => x.id === d.id) === i
+        (d,i,arr) => arr.findIndex(x=>x.id===d.id)===i
       )
-      unique.sort((a, b) =>
+      const formsOnly = unique.filter(d =>
+        ['PDF','Excel','Module'].includes(d.type)
+      )
+      formsOnly.sort((a,b) =>
         new Date(b.updated_at) - new Date(a.updated_at)
       )
-      setForms(unique)
-    })
-    .catch(() => toast.error('Không thể tải biểu mẫu'))
-    .finally(() => setLoading(false))
+      setForms(formsOnly)
+    } catch {
+      toast.error('Không thể tải biểu mẫu')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadForms()
+    window.addEventListener('focus', loadForms)
+    return () => window.removeEventListener('focus', loadForms)
   }, [])
 
   const filteredForms = forms.filter(f => {
@@ -225,7 +237,7 @@ export default function FormsPage() {
                       toast.info('File chưa được đính kèm')
                     }
                   }}>Tải xuống</Button>
-                  <Button variant="secondary" icon={ExternalLink} onClick={() => toast.info("Trình xem sẽ được tích hợp sau")}>Mở xem trước</Button>
+                  <Button variant="secondary" icon={ExternalLink} onClick={() => setPreviewForm(selectedForm)}>Mở xem trước</Button>
                   <Button variant="ghost" icon={Share2} onClick={() => toast.success("Đã sao chép link!")}>Chia sẻ</Button>
                   {isAdmin && <Button variant="ghost" icon={Edit} className="text-surface-500">Chỉnh sửa</Button>}
                 </div>
@@ -273,6 +285,15 @@ export default function FormsPage() {
           )}
         </AnimatePresence>
       </div>
+
+      <Modal
+        open={!!previewForm}
+        onClose={() => setPreviewForm(null)}
+        title={previewForm?.name || ''}
+        size="lg"
+      >
+        <DocumentViewer doc={previewForm} />
+      </Modal>
     </div>
   );
 }

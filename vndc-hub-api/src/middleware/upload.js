@@ -14,7 +14,7 @@ const storage = multer.diskStorage({
     const base = path.basename(file.originalname, ext)
       .replace(/[^a-zA-Z0-9]/g, '_')
       .substring(0, 50)
-    const unique = Date.now() + '_' + Math.round(Math.random()*1e6)
+    const unique = Date.now() + '_' + Math.round(Math.random() * 1e6)
     cb(null, `${base}_${unique}${ext}`)
   }
 })
@@ -45,9 +45,9 @@ export const uploadSingle = multer({
 // Detect type từ mimetype
 export function detectFileType(mimetype) {
   if (mimetype === 'application/pdf' ||
-      mimetype?.includes('word')) return 'PDF'
+    mimetype?.includes('word')) return 'PDF'
   if (mimetype?.includes('excel') ||
-      mimetype?.includes('spreadsheet')) return 'Excel'
+    mimetype?.includes('spreadsheet')) return 'Excel'
   if (mimetype?.startsWith('video/')) return 'Video'
   return 'Module'
 }
@@ -56,6 +56,6 @@ export function detectFileType(mimetype) {
 export function formatFileSize(bytes) {
   if (!bytes) return '—'
   if (bytes < 1024) return bytes + ' B'
-  if (bytes < 1024*1024) return (bytes/1024).toFixed(1) + ' KB'
-  return (bytes/(1024*1024)).toFixed(1) + ' MB'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
 }
