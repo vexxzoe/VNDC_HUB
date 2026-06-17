@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
-import { api } from '@/utils/api';
+import { api, API_BASE_URL as API_URL } from '@/utils/api';
 import { Badge, Button } from '@/components/ui';
 import { formatRelativeTime } from '@/utils/formatTime';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,8 +11,6 @@ import {
   Building2, Users, FileText, Table2, Video, BookOpen,
   ClipboardList, Eye, Bell
 } from 'lucide-react';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 

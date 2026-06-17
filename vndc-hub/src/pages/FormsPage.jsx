@@ -1,16 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { Badge, Button, Modal } from '@/components/ui';
 import DocumentViewer from '@/components/ui/DocumentViewer';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { normalizeAudience } from '@/utils/permissions';
-import { Search, FileText, Table2, BookOpen, Download, ExternalLink, Share2, Edit, Link2, Info, Calendar, Tag, Users } from 'lucide-react';
-import { api } from '@/utils/api';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+import { Search, FileText, Table2, BookOpen, Download, ExternalLink, Share2, Link2, Info, Calendar, Tag, Users } from 'lucide-react';
+import { api, API_BASE_URL as API_URL } from '@/utils/api';
 
 const TYPES = ['Tất cả', 'PDF', 'Excel', 'Module'];
 
@@ -27,7 +24,6 @@ const COLOR_MAP = {
 };
 
 export default function FormsPage() {
-  const { isAdmin } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -92,6 +88,19 @@ export default function FormsPage() {
     if (type === 'Excel') return "Mở bằng Excel hoặc Google Sheets. Điền đầy đủ thông tin vào các ô được đánh dấu và gửi qua email.";
     if (type === 'Module') return "Đọc kỹ các bước trước khi thực hiện quy trình. Liên hệ quản lý trực tiếp nếu có thắc mắc.";
     return "";
+  };
+
+  const copyDocLink = async (doc) => {
+    if (!doc?.file_url) {
+      toast.info('File chưa được đính kèm');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(`${API_URL}${doc.file_url}`);
+      toast.success('Đã sao chép link tài liệu');
+    } catch {
+      toast.error('Không thể sao chép link');
+    }
   };
 
   if (loading) return (
@@ -240,8 +249,7 @@ export default function FormsPage() {
                     }
                   }}>Tải xuống</Button>
                   <Button variant="secondary" icon={ExternalLink} onClick={() => setPreviewForm(selectedForm)}>Mở xem trước</Button>
-                  <Button variant="ghost" icon={Share2} onClick={() => toast.success("Đã sao chép link!")}>Chia sẻ</Button>
-                  {isAdmin && <Button variant="ghost" icon={Edit} className="text-surface-500">Chỉnh sửa</Button>}
+                  <Button variant="ghost" icon={Share2} onClick={() => copyDocLink(selectedForm)}>Chia sẻ</Button>
                 </div>
               </div>
 

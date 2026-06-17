@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: vndc_hub
       POSTGRES_USER: vndc_user
-      POSTGRES_PASSWORD: vndc_pass_2025
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-change-me}
     ports:
       - "5433:5432"
     volumes:
@@ -38,23 +38,23 @@ services:
     container_name: vndc_hub_api
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "4002:3001"
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       PORT: 3001
       DB_HOST: vndc_hub_db
       DB_PORT: 5432
       DB_NAME: vndc_hub
       DB_USER: vndc_user
-      DB_PASSWORD: vndc_pass_2025
+      DB_PASSWORD: ${DB_PASSWORD:-change-me}
       REDIS_HOST: vndc_hub_redis
       REDIS_PORT: 6379
-      JWT_SECRET: vndc_hub_super_secret_jwt_2025
-      FRONTEND_URL: http://localhost:5173
+      JWT_SECRET: ${JWT_SECRET}
+      FRONTEND_URL: https://hub.vnsign.vn
       UPLOAD_DIR: /app/uploads
       GROQ_API_KEY: ${GROQ_API_KEY}
     volumes:
-      - vndc_hub_uploads:/app/uploads
+      - ./uploads:/app/uploads
     depends_on:
       vndc_hub_db:
         condition: service_healthy
@@ -66,5 +66,3 @@ volumes:
     name: vndc_hub_db_data
   vndc_hub_redis_data:
     name: vndc_hub_redis_data
-  vndc_hub_uploads:
-    name: vndc_hub_uploads

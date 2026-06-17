@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import * as XLSX from 'xlsx'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+import { API_BASE_URL as API_URL } from '@/utils/api'
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 
 export default function DocumentViewer({ doc }) {
@@ -47,7 +47,7 @@ export default function DocumentViewer({ doc }) {
 
       // ── VIDEO ──
       if (['mp4','webm','mov','avi'].includes(ext)) {
-        setContent({ type: 'video', url: url.replace('.mp4','.stream') })
+        setContent({ type: 'video', url })
         setLoading(false)
         return
       }

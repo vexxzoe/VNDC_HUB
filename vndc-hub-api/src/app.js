@@ -43,18 +43,17 @@ app.use(morgan(config.NODE_ENV === 'production' ? 'combined' : 'dev'))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 app.use('/uploads', (req, res, next) => {
-  // Mẹo bypass IDM: Nếu URL có đuôi .stream thì đổi lại thành .mp4 để express.static đọc đúng file vật lý
+  // Backward compat: .stream URLs từ phiên bản cũ → rewrite về .mp4
   if (req.url.endsWith('.stream')) {
-    req.url = req.url.replace('.stream', '.mp4');
+    req.url = req.url.replace(/\.stream$/, '.mp4');
   }
   res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS')
   res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
   res.setHeader('Timing-Allow-Origin', '*')
   next()
 }, express.static(config.UPLOAD_DIR, {
-  setHeaders: (res, path) => {
-    // Cho phép video streaming với range requests
+  setHeaders: (res) => {
     res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
     res.setHeader('Content-Disposition', 'inline')

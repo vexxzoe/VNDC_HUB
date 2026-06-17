@@ -3,19 +3,14 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { api } from '@/utils/api';
 import { DEPARTMENT_PERMISSIONS } from '@/data/mockData';
-import { Avatar, Badge, Button } from '@/components/ui';
+import { Badge } from '@/components/ui';
 import { formatRelativeTime } from '@/utils/formatTime';
 import { clsx } from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ShieldCheck, AlertTriangle, UserCheck, UserX, UserPlus,
-  Library, PlayCircle, FileText, Upload, BarChart2, Users, Mail
+  ShieldCheck, AlertTriangle,
+  Library, PlayCircle, FileText, Upload, BarChart2, Users
 } from 'lucide-react';
-
-const PENDING_ACCOUNTS = [
-  { id:"p1", email:"newstaff@vndc.vn",  department:"Kinh doanh", role:"member", requestedAt:"2025-05-25" },
-  { id:"p2", email:"intern@vndc.vn",    department:"CSKH",       role:"member", requestedAt:"2025-05-26" },
-];
 
 const INITIAL_CHANGE_LOG = [
   { id:"c1", action:"Bật quyền updates", dept:"Kỹ thuật",   by:"Nguyễn Admin", time:"2025-05-20T10:00:00" },
@@ -60,7 +55,6 @@ export default function AccessPage() {
   const toast = useToast();
 
   const [permissions, setPermissions] = useState(DEPARTMENT_PERMISSIONS);
-  const [pendingAccounts, setPendingAccounts] = useState(PENDING_ACCOUNTS);
   const [changeLog, setChangeLog] = useState(INITIAL_CHANGE_LOG);
   const [showAllLogs, setShowAllLogs] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -76,17 +70,6 @@ export default function AccessPage() {
       .catch(() => toast.error('Không thể tải phân quyền'))
       .finally(() => setLoading(false))
   }, [])
-
-
-  const addLog = (action, dept) => {
-    setChangeLog(prev => [{
-      id: 'c' + Date.now(),
-      action,
-      dept,
-      by: user?.name || 'System',
-      time: new Date().toISOString()
-    }, ...prev].slice(0, 20));
-  };
 
   // THAY ĐỔI 2: handleToggle gọi API thật + optimistic update
   const handleToggle = async (dept, permKey) => {
@@ -114,29 +97,6 @@ export default function AccessPage() {
       }))
       toast.error('Không thể cập nhật quyền: ' + err.message)
     }
-  };
-
-  // THAY ĐỔI 3: handleApprove gọi API
-  const handleApprove = async (account) => {
-    try {
-      await api.createUser({
-        email: account.email,
-        name: account.email.split('@')[0],
-        department: account.department,
-        role: account.role || 'member',
-        password: '123456'
-      })
-      setPendingAccounts(prev => prev.filter(a => a.id !== account.id))
-      toast.success('Đã duyệt tài khoản: ' + account.email)
-    } catch (err) {
-      toast.error('Lỗi duyệt tài khoản: ' + err.message)
-    }
-  };
-
-  // THAY ĐỔI 4: handleReject
-  const handleReject = (account) => {
-    setPendingAccounts(prev => prev.filter(a => a.id !== account.id))
-    toast.info('Đã từ chối: ' + account.email)
   };
 
   const visibleLogs = showAllLogs ? changeLog : changeLog.slice(0, 5);
@@ -198,52 +158,6 @@ export default function AccessPage() {
                 </tbody>
               </table>
             </div>
-          </div>
-
-          {/* Pending Accounts */}
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <h2 className="font-bold text-surface-900 text-lg">Tài khoản chờ duyệt</h2>
-              {pendingAccounts.length > 0 && <Badge variant="warning">{pendingAccounts.length}</Badge>}
-            </div>
-
-            {pendingAccounts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-10 bg-white border border-surface-200 rounded-2xl border-dashed">
-                <UserCheck className="w-10 h-10 text-surface-300 mb-2" />
-                <p className="font-medium text-surface-500 text-sm">Không có tài khoản chờ duyệt</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-3">
-                <AnimatePresence>
-                  {pendingAccounts.map(acc => (
-                    <motion.div
-                      key={acc.id}
-                      layout
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, x: -20 }}
-                      className="bg-white border border-surface-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 justify-between shadow-sm"
-                    >
-                      <div className="flex items-center gap-4">
-                        <Avatar name={acc.email} size="md" />
-                        <div>
-                          <p className="font-semibold text-surface-900">{acc.email}</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="default" className="text-[10px]">{acc.department}</Badge>
-                            <Badge variant="surface" className="text-[10px]">{acc.role === 'admin' ? 'Quản trị' : 'Nhân viên'}</Badge>
-                            <span className="text-xs text-surface-400">Yêu cầu: {formatRelativeTime(acc.requestedAt)}</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2 self-end sm:self-auto">
-                        <Button variant="danger" size="sm" icon={UserX} onClick={() => handleReject(acc)}>Từ chối</Button>
-                        <Button variant="success" size="sm" icon={UserCheck} onClick={() => handleApprove(acc)}>Duyệt</Button>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            )}
           </div>
         </div>
 

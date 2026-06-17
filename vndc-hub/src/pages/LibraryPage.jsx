@@ -3,7 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useToast } from '@/context/ToastContext';
 import { DOCUMENTS } from '@/data/mockData';
 import { Trash2 } from 'lucide-react';
-import { api } from '@/utils/api';
+import { api, API_BASE_URL as API_URL } from '@/utils/api';
 import { useDocSearch } from '@/hooks/useDocSearch';
 import { getFilteredDocs } from '@/utils/permissions';
 import { Button, Badge, Card, Modal, Input } from '@/components/ui';
@@ -11,11 +11,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { 
   Upload, Plus, Search, X, FileText, Table2, Video, BookOpen, 
-  ClipboardList, ShieldCheck, Eye, Star, Download, MoreVertical, SearchX, Rocket, HeartHandshake, TrendingUp, Wrench, Crown, Award, Unlock, Bell
+  ClipboardList, ShieldCheck, Eye, Star, Download, Share2, MoreVertical, SearchX, Rocket, HeartHandshake, TrendingUp, Wrench, Crown, Award, Unlock, Bell
 } from 'lucide-react';
 import DocumentViewer from '@/components/ui/DocumentViewer';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const DEPARTMENTS = ['Tất cả', 'Chung', 'Kinh doanh', 'CSKH', 'Kỹ thuật', 'Vận hành', 'Nhân sự'];
 const TYPES = [
@@ -169,7 +167,6 @@ export default function LibraryPage() {
     }
   };
 
-  // FIX 5: Xoá tài liệu (admin only)
   const handleDeleteDoc = async (doc, e) => {
     e.stopPropagation();
     if (!window.confirm(`Xoá tài liệu "${doc.name}"?`)) return;
@@ -185,7 +182,18 @@ export default function LibraryPage() {
     }
   };
 
-
+  const copyDocLink = async (doc) => {
+    if (!doc?.file_url) {
+      toast.error('Tài liệu chưa có link để chia sẻ');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(`${API_URL}${doc.file_url}`);
+      toast.success('Đã sao chép link tài liệu');
+    } catch {
+      toast.error('Không thể sao chép link');
+    }
+  };
 
   return (
     <div className="w-full flex-1 flex flex-col gap-6 px-4 sm:px-6 py-8 mx-auto max-w-[1400px]">
@@ -341,7 +349,15 @@ export default function LibraryPage() {
                     <Button variant="ghost" size="sm" onClick={(e) => toggleBookmark(activeDoc.id, e)} className="shrink-0 p-2">
                       <Star className={clsx("w-5 h-5", activeDoc.bookmarked ? "fill-primary-500 text-primary-500" : "text-surface-400")} />
                     </Button>
-                    <Button variant="secondary" size="sm" className="hidden sm:flex shrink-0">Chia sẻ</Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={Share2}
+                      className="hidden sm:flex shrink-0"
+                      onClick={() => copyDocLink(activeDoc)}
+                    >
+                      Chia sẻ
+                    </Button>
                     <Button 
                       variant="primary" 
                       size="sm" 

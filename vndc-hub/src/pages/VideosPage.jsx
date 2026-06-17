@@ -5,7 +5,7 @@ import { Badge, Button } from '@/components/ui';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx } from 'clsx';
 import { Eye, Clock, Share2, Play, CheckCircle2, Download } from 'lucide-react';
-import { api } from '@/utils/api';
+import { api, API_BASE_URL as API_URL } from '@/utils/api';
 
 const VIDEOS_FALLBACK = [
   { id:"v1", title:"Onboarding nhân viên mới",         duration:"12:34", dept:"Chung",       thumb:"👋", views:210, tag:"onboarding" },
@@ -20,8 +20,6 @@ const VIDEOS_FALLBACK = [
 
 const DEPARTMENTS = ['Tất cả', 'Chung', 'Kinh doanh', 'CSKH', 'Kỹ thuật'];
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
 // Component tạo thumbnail từ video bằng Canvas API
 const VideoThumb = ({ fileUrl, title }) => {
   const videoRef = useRef(null)
@@ -35,8 +33,8 @@ const VideoThumb = ({ fileUrl, title }) => {
     video.muted = true
     video.preload = 'metadata'
 
-    // Dùng .stream để bypass IDM
-    const streamUrl = `${API_URL}${fileUrl.replace('.mp4', '.stream')}`
+    // Dùng URL thẳng — Content-Disposition: inline ở backend đủ để ngăn IDM
+    const streamUrl = `${API_URL}${fileUrl}`
     video.src = streamUrl
 
     video.addEventListener('loadeddata', () => {
@@ -216,8 +214,8 @@ export default function VideosPage() {
                   onError={() => setVideoError(true)}
                   onLoadStart={() => setVideoError(false)}
                 >
-                  <source src={`${API_URL}${selectedVideo.file_url.replace(/\.mp4$/i, '.stream')}`} type="video/mp4" />
-                  <source src={`${API_URL}${selectedVideo.file_url.replace(/\.webm$/i, '.stream')}`} type="video/webm" />
+                  <source src={`${API_URL}${selectedVideo.file_url}`} type="video/mp4" />
+                  <source src={`${API_URL}${selectedVideo.file_url}`} type="video/webm" />
                   Trình duyệt không hỗ trợ video này.
                 </video>
               )
@@ -280,9 +278,15 @@ export default function VideosPage() {
                   onClick={() => setSelectedVideo(v)}
                   className="w-48 flex-shrink-0 bg-white border border-surface-200 rounded-xl overflow-hidden cursor-pointer hover:shadow-card transition-all hover:-translate-y-0.5 relative group"
                 >
-                  <div className="h-28 bg-slate-800 flex items-center justify-center text-4xl relative overflow-hidden">
-                    {v.thumb}
-                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <div className="h-28 bg-slate-800 relative overflow-hidden">
+                    {v.file_url ? (
+                      <VideoThumb fileUrl={v.file_url} title={v.title} />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-4xl">
+                        {v.thumb || '🎬'}
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                       <Play className="w-8 h-8 text-white" />
                     </div>
                   </div>
